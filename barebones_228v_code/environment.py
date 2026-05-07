@@ -12,18 +12,77 @@ import imageio
 class SearchEnv(Env):
     """Multi-agent search environment with Dec-POMDP framework"""
     def __init__(self):
-        self.grid_size = 15 # The side length of the square grid-world
-        self.wind_speed = 0.0 # The probability of the wind moving drones
-        self.wind_direction = 0 # The direction the wind would bias drone movement in radians
+        self.grid_size = 20 # The side length of the square grid-world
+        # TODO Add back in wind later if it's something we want to include
+        # self.wind_speed = 0.0 # The probability of the wind moving drones
+        # self.wind_direction = 0 # The direction the wind would bias drone movement in radians
         
         self.fire_pos = np.random.randint(0, self.grid_size, size=2) # The random 2D position of the fire
         self.fire_extinguished = False
+
+        # Obstacle stuff
+        # Current setup is there's a separate set of variables for small obstacles and large obstacles
+        # Might switch this later to where there's just one distribution that's pulled from 
+        self.obstacle_grid = np.zeros((self.grid_size, self.grid_size), dtype = bool) # just a list for each cell indicating whether an obstacle is in it or not
+        self.obstacles = []
 
         self.patches = []
         self.fig, self.ax = None, None
         self.status_texts = []
         self.frames = []
         self.record_frames = False
+
+    def reset_obstacles(self):
+        # clears existing obstacles from the environment, called before generating a new map
+        self.obstacle_grid = np.zeros((self.grid_size))
+        self.obstacles = []
+
+    def in_bounds(self, r, c):
+        # checks if a given cell, with coordinates row r and column c, is inside the environment
+        return 0 <= r < self.grid_size and 0 <= c < self.grid_size
+    
+    def is_obstacle(self, r, c):
+        # just returns whether or not the cell at row r and column c is an obstacle or free space
+        return self.obstacle_grid[r, c]
+    
+    def is_free(self, r, c):
+        # returns whether or not the cell at row r and column c is a free space
+        return self.in_bounds(r, c) and not self.is_obstacle(r, c)
+    
+    def _sample_obstacle_size(self, mu, sigma, min_size = 1, max_size = 5):
+        # lets us draw obstacle sizes from the small or large obstacle size distributions we define in the config file
+        if max_size is None:
+            max_size = max(1, self.grid_size // 4) # makes it so we don't go a lil too crazy with oversized obstacles
+
+        size = int(round(np.random.normal(mu, sigma)))
+        return int(np.clip(size, min_size, max_size))
+    
+    def _rectangle_cells(self, top_left, height, width):
+        # generates all the grid cells covered by a rectangle obstacle
+        r0, c0 = top_left
+        cells = []
+        for r in range(r0, r0 + height):
+            for c in range(c0, c0 + width):
+                if self.in_bounds(r, c):
+                    cells.append((r, c))
+        return cells
+    
+    def _too_close(cell, protected_cells, buffer_radius):
+        # just tells us if an obstacle cell or objective cell is within a no-go zone
+        r, c = cell
+        for pr, pc in protected_cells:
+            if abs(r - pr) + abs(c - pc) <= buffer_radius:
+                return True
+        return False
+    
+    def _can_place_obstacle(self, cells, protected_cells, buffer_radius):
+        # compares our list of grid cells with obstacle cells and too-close cells to see where further obstacles can and cannot be placed
+        for r, c in cells:
+            if self.obstacle_grid[r, c]:
+                return False
+            if self._too_close((r, c), protected_cells, buffer_radius):
+                return False
+        return True
 
     def render(self, drones):
         grid = np.zeros((self.grid_size, self.grid_size))
@@ -91,14 +150,15 @@ class SearchEnv(Env):
                              color=text_color, fontweight=font_weight,
                              bbox=dict(facecolor=bg_color, alpha=0.8, edgecolor='gray', boxstyle='round'))
             self.status_texts.append(t)
-
+        
+        # TODO Fix later, Just me editing out more wind related stuff
         # Draw wind direction arrow
-        arrow_len = 1.5
-        dx = np.sin(self.wind_direction) * arrow_len
-        dy = np.cos(self.wind_direction) * arrow_len
-        arrow = patches.Arrow(self.grid_size - 2.5, 2.5, dx, dy, width=0.5, color='black', zorder=10)
-        self.ax.add_patch(arrow)
-        self.patches.append(arrow)
+        # arrow_len = 1.5
+        # dx = np.sin(self.wind_direction) * arrow_len
+        # dy = np.cos(self.wind_direction) * arrow_len
+        # arrow = patches.Arrow(self.grid_size - 2.5, 2.5, dx, dy, width=0.5, color='black', zorder=10)
+        # self.ax.add_patch(arrow)
+        # self.patches.append(arrow)
 
         for drone in drones:
             corner_x = drone.x - drone.window_size // 2 - 0.5
