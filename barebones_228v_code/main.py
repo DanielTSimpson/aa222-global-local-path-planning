@@ -64,10 +64,17 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     env.grid_size = cfg.GRID_SIZE
 
     env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA, protected_cells=[tuple(env.fire_pos)], buffer_radius = cfg.OBSTACLE_BUFFER_AROUND_OBJECTIVES)
-    # env.wind_speed = cfg.WIND_SPEED
-    # env.wind_direction = cfg.WIND_DIRECTION
+    
+    if cfg.ENABLE_WIND:
+        env.wind_speed = cfg.WIND_SPEED
+        env.wind_direction = cfg.WIND_DIRECTION
+    else:
+        env.wind_speed = 0.0
+        env.wind_direction = 0.0
     if save_gif:
         env.record_frames = True
+
+    
 
     # Initialize the drones
     drone_window_size = cfg.OBSERVATION_WINDOW_SIZE
@@ -114,13 +121,14 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     drones[1].history = [drones[1].state]
 
     # === Inject disturbances, x into Environment's Wind ===
-    env.wind_speed = np.random.normal(x[3], np.sqrt(x[4]))
-    env.wind_direction = x[5]*2*np.pi*np.random.random() + (1-x[5])*np.random.normal((theta_A + theta_B)/2, np.sqrt(x[6]))
+    if cfg.ENABLE_WIND:
+        env.wind_speed = np.random.normal(x[3], np.sqrt(x[4]))
+        env.wind_direction = x[5]*2*np.pi*np.random.random() + (1-x[5])*np.random.normal((theta_A + theta_B)/2, np.sqrt(x[6]))
 
     # Main simulation loop
     for i in range(N):
         # Bias the Dynamic Wind every 10 time steps to push the drones away from the fire
-        if i > 0 and i % 10 == 0:
+        if cfg.ENABLE_WIND and i > 0 and i % 10 == 0:
             theta_A = np.arctan2(drones[0].position[1] - env.fire_pos[1], drones[0].position[0] - env.fire_pos[0])
             theta_B = np.arctan2(drones[1].position[1] - env.fire_pos[1], drones[1].position[0] - env.fire_pos[0])
             env.wind_direction = x[5]*2*np.pi*np.random.random() + (1-x[5])*np.random.normal((theta_A + theta_B)/2, np.sqrt(x[6]))

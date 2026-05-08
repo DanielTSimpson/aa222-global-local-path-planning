@@ -11,6 +11,9 @@ MAX_SIMULATION_TIME = 250.0
 MAX_BUDGET = 5000
 RENDER_PAUSE = 0.25
 
+# Wind Toggle
+ENABLE_WIND = False
+
 #  ===== Environment parameters ===== 
 GRID_SIZE = 25  # Size of the NxN grid
 WIND_SPEED = np.random.normal(0.05, 0.05**2) # Probability of agents drifting after an action

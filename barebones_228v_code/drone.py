@@ -89,7 +89,7 @@ class Drone():
         self.drifted = False
         # Apply wind drift
 
-        if np.random.random() < abs(self.env.wind_speed):
+        if cfg.ENABLE_WIND and np.random.random() < abs(self.env.wind_speed):
             cos_wind = np.cos(self.env.wind_direction)
             sin_wind = np.sin(self.env.wind_direction)
             
