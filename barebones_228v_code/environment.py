@@ -34,7 +34,7 @@ class SearchEnv(Env):
 
     def reset_obstacles(self):
         # clears existing obstacles from the environment, called before generating a new map
-        self.obstacle_grid = np.zeros((self.grid_size))
+        self.obstacle_grid = np.zeros((self.grid_size, self.grid_size), dtype = bool) # just a list for each cell indicating whether an obstacle is in it or not
         self.obstacles = []
 
     def in_bounds(self, r, c):
@@ -59,6 +59,7 @@ class SearchEnv(Env):
     
     def _rectangle_cells(self, top_left, height, width):
         # generates all the grid cells covered by a rectangle obstacle
+        # TODO need to add in a function for non-rectangular obstacles later
         r0, c0 = top_left
         cells = []
         for r in range(r0, r0 + height):
@@ -67,7 +68,7 @@ class SearchEnv(Env):
                     cells.append((r, c))
         return cells
     
-    def _too_close(cell, protected_cells, buffer_radius):
+    def _too_close(self, cell, protected_cells, buffer_radius):
         # just tells us if an obstacle cell or objective cell is within a no-go zone
         r, c = cell
         for pr, pc in protected_cells:
@@ -84,8 +85,50 @@ class SearchEnv(Env):
                 return False
         return True
 
+    def add_rectangle_obstacle(self, height, width, protected_cells=None, buffer_radius = 0):
+        # goes through and determines where we can place a rectangle obstacle of a given height and width, and then updates the obstacle grid and list of obstacles accordingly
+        if protected_cells is None:
+            protected_cells = []
+        for _ in range(500): # TODO add max attempts parameter here rather than hard coding 500
+            r0 = np.random.randint(0, self.grid_size - height + 1)
+            c0 = np.random.randint(0, self.grid_size - width + 1)
+
+            cells = self._rectangle_cells((r0, c0), height, width)
+
+            if self._can_place_obstacle(cells, protected_cells, buffer_radius):
+                for r, c in cells:
+                    self.obstacle_grid[r, c] = True
+                obstacle = {"shape": "rectangle", "top_left": (r0, c0), "height": height, "width": width, "cells": cells}
+                self.obstacles.append(obstacle)
+                return obstacle
+        return None
+    
+    def generate_obstacles(self, num_large = 5, num_small = 15, large_mu = 4, large_sigma = 1.0, small_mu = 1.5, small_sigma = 0.5, protected_cells = None, buffer_radius = 2):
+        # actually going about generating all of our obstacles in the grid space
+        
+        # start by clearing existing obstacles from the environment
+        self.reset_obstacles()
+
+        if protected_cells is None:
+            protected_cells = [tuple(self.fire_pos)]
+
+        # start with adding in all of our large obstacles
+        for _ in range(num_large):
+            h = self._sample_obstacle_size(large_mu, large_sigma, min_size = 2)
+            w = self._sample_obstacle_size(large_mu, large_sigma, min_size = 2)
+            self.add_rectangle_obstacle(h, w, protected_cells, buffer_radius)
+
+        # now we add in our small obstacles
+        for _ in range(num_small):
+            h = self._sample_obstacle_size(small_mu, small_sigma, min_size = 1, max_size = 3)
+            w = self._sample_obstacle_size(small_mu, small_sigma, min_size = 1, max_size = 3)
+            self.add_rectangle_obstacle(h, w, protected_cells, buffer_radius)
+
+        return self.obstacles
+
     def render(self, drones):
         grid = np.zeros((self.grid_size, self.grid_size))
+        grid[self.obstacle_grid] = 7
         
         # Mark explored cells (visited or observed)
         for drone in drones:
@@ -98,8 +141,8 @@ class SearchEnv(Env):
         for idx, drone in enumerate(drones):
             grid[tuple(drone.position)] = idx + 3
 
-        cmap = colors.ListedColormap(['#ffcccc', 'white', 'red', 'blue', 'green', 'orange', 'purple'])
-        bounds = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5]
+        cmap = colors.ListedColormap(['#ffcccc', 'white', 'red', 'blue', 'green', 'orange', 'purple', 'black'])
+        bounds = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
 
         if self.fig is None:

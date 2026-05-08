@@ -101,6 +101,10 @@ class Drone():
                 x = max(0, min(self.env.grid_size - 1, x + dx))
                 y = max(0, min(self.env.grid_size - 1, y + dy))
 
+            # quick obstacle collision check
+            if self.env.obstacle_grid[x, y] == 1:
+                x, y = prev_position
+
         self.position = np.array([x, y])
         
         if np.array_equal(self.position, prev_position):

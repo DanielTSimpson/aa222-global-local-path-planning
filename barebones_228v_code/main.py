@@ -62,8 +62,10 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     env = SearchEnv()
     env.fire_pos = (1, 1) # Place the fire at one corner as a fixed extreme point
     env.grid_size = cfg.GRID_SIZE
-    env.wind_speed = cfg.WIND_SPEED
-    env.wind_direction = cfg.WIND_DIRECTION
+
+    env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA, protected_cells=[tuple(env.fire_pos)], buffer_radius = cfg.OBSTACLE_BUFFER_AROUND_OBJECTIVES)
+    # env.wind_speed = cfg.WIND_SPEED
+    # env.wind_direction = cfg.WIND_DIRECTION
     if save_gif:
         env.record_frames = True
 
