@@ -128,12 +128,14 @@ class SearchEnv(Env):
 
     def render(self, drones):
         grid = np.zeros((self.grid_size, self.grid_size))
-        grid[self.obstacle_grid] = 7
         
         # Mark explored cells (visited or observed)
         for drone in drones:
             for (r, c) in drone.visited_cells:
-                grid[r, c] = 1
+                if not self.obstacle_grid[r, c]: # only mark cells as explored if they're not an obstacle -- otherwise we're overwriting those grids visually
+                    grid[r, c] = 1
+        grid[self.obstacle_grid] = 7
+
 
         if not self.fire_extinguished:
             grid[tuple(self.fire_pos)] = 2

@@ -96,6 +96,13 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     new_y = int(x[0]*droneA_old_pos[1] + (1-x[0])*np.round(fire_y + distance_A * np.sin(theta_A)))
     new_x = max(0, min(env.grid_size - 1, new_x))
     new_y = max(0, min(env.grid_size - 1, new_y))
+    
+    # ensuring drones can't be initialized inside of or move to an obstacle
+    while env.is_obstacle(new_x, new_y):
+        new_x = np.random.randint(0, env.grid_size)
+        new_y = np.random.randint(0, env.grid_size)
+        
+    drones[0].position = np.array([new_x, new_y])
     drones[0].position = np.array([new_x, new_y])
     drones[0].visited_cells = {(new_x, new_y)}
     drones[0].belief_state = Belief(env.grid_size)
@@ -114,6 +121,12 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     new_y = int(x[0]*droneB_old_pos[1] + (1-x[0])*np.round(fire_y + distance_B * np.sin(theta_B)))
     new_x = max(0, min(env.grid_size - 1, new_x))
     new_y = max(0, min(env.grid_size - 1, new_y))
+    
+    # ensuring drones can't be initialized inside of or move to an obstacle
+    while env.is_obstacle(new_x, new_y):
+        new_x = np.random.randint(0, env.grid_size)
+        new_y = np.random.randint(0, env.grid_size)
+        
     drones[1].position = np.array([new_x, new_y])
     drones[1].visited_cells = {(new_x, new_y)}
     drones[1].belief_state = Belief(env.grid_size)

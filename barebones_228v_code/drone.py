@@ -16,7 +16,11 @@ class Drone():
         self.drone_id = 0
         self.window_size = 0
         self.env = environment
-        self.position = np.random.randint(0, self.env.grid_size, size=2)
+        # making sure our drone doesn't spawn inside of an obstacle
+        while True:
+            self.position = np.random.randint(0, self.env.grid_size, size = 2)
+            if not self.env.is_obstacle(self.position[0], self.position[1]):
+                break
         self.budget = cfg.MAX_BUDGET
         self.belief_state = Belief(self.env.grid_size)
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
@@ -106,6 +110,13 @@ class Drone():
                 x, y = prev_position
 
         self.position = np.array([x, y])
+        
+        # candidate position after our intended action / if the wind is blowing
+        candidate = np.array([x,y])
+        # we're using that candidate position to prevent the drone from moving into any obstacles
+        if self.env.is_obstacle(candidate[0], candidate[1]):
+            candidate = prev_position
+            self.position = candidate # no need to rewrite self.position if we don't end up in an obstacle with our projected plan
         
         if np.array_equal(self.position, prev_position):
             self.stuck_count += 1
