@@ -83,68 +83,43 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     failure_mode = 2 # Default to "Out of Time"
     time_to_obj = N
     total_comms = 0
-
-
-    # === Inject disturbances, x into Drone A ===
-    droneA_old_pos = drones[0].position
-    theta_A = np.random.uniform(0, np.pi / 2) # Choose a random initial angle from Uniform(0, 90deg)
-    distance_A = np.random.normal(int(cfg.GRID_SIZE * x[1]), int(cfg.GRID_SIZE * np.sqrt(x[2]))) # Choose a random initial distance from Normal(x[0], x[1])
     
-    # Map polar coordinates to discrete grid relative to fire
-    fire_x, fire_y = env.fire_pos
-    new_x = int(x[0]*droneA_old_pos[0] + (1-x[0])*np.round(fire_x + distance_A * np.cos(theta_A))) # Bias the drone to the random position or radial position
-    new_y = int(x[0]*droneA_old_pos[1] + (1-x[0])*np.round(fire_y + distance_A * np.sin(theta_A)))
-    new_x = max(0, min(env.grid_size - 1, new_x))
-    new_y = max(0, min(env.grid_size - 1, new_y))
-    
-    # ensuring drones can't be initialized inside of or move to an obstacle
-    while env.is_obstacle(new_x, new_y):
-        new_x = np.random.randint(0, env.grid_size)
-        new_y = np.random.randint(0, env.grid_size)
+    for drone in drones:
+        old_pos = drone.position
+        theta = np.random.uniform(0, np.pi / 2) # picks a random angle for the drone to start from
+        distance = np.random.normal(int(cfg.GRID_SIZE * x[1]), int(cfg.GRID_SIZE * np.sqrt(x[2]))) # picks a random distance for the drone to start from
+        fire_x, fire_y = env.fire_pos # gets the fire position from the environment
+        new_x = int(x[0] * old_pos[0] + (1 - x[0]) * np.round(fire_x + distance * np.cos(theta))) 
+        new_y = int(x[0] * old_pos[1] + (1 - x[0]) * np.round(fire_y + distance * np.sin(theta)))
+        new_x = max(0, min(env.grid_size - 1, new_x))
+        new_y = max(0, min(env.grid_size - 1, new_y))
         
-    drones[0].position = np.array([new_x, new_y])
-    drones[0].position = np.array([new_x, new_y])
-    drones[0].visited_cells = {(new_x, new_y)}
-    drones[0].belief_state = Belief(env.grid_size)
-    drones[0].fire_found = drones[0].observe()
-    drones[0].history = [drones[0].state]
-
-
-    # === Inject disturbances, x into Drone B ===
-    droneB_old_pos = drones[1].position
-    theta_B = np.random.uniform(0, np.pi / 2) # Choose a random initial angle from Uniform(0, 90deg)
-    distance_B = np.random.normal(int(cfg.GRID_SIZE * x[1]), int(cfg.GRID_SIZE * x[2]**2)) # Choose a random initial distance from Normal(x[0], x[1])
-    
-    # Map polar coordinates to discrete grid relative to fire
-    fire_x, fire_y = env.fire_pos
-    new_x = int(x[0]*droneB_old_pos[0] + (1-x[0])*np.round(fire_x + distance_B * np.cos(theta_B))) # Bias the drone to the random position or radial position
-    new_y = int(x[0]*droneB_old_pos[1] + (1-x[0])*np.round(fire_y + distance_B * np.sin(theta_B)))
-    new_x = max(0, min(env.grid_size - 1, new_x))
-    new_y = max(0, min(env.grid_size - 1, new_y))
-    
-    # ensuring drones can't be initialized inside of or move to an obstacle
-    while env.is_obstacle(new_x, new_y):
-        new_x = np.random.randint(0, env.grid_size)
-        new_y = np.random.randint(0, env.grid_size)
+        # we want to make sure we avoid spawning our drones inside obstacles, which is what this little loop does
+        while env.is_obstacle(new_x, new_y):
+            new_x = np.random.randint(0, env.grid_size)
+            new_y = np.random.randint(0, env.grid_size)
         
-    drones[1].position = np.array([new_x, new_y])
-    drones[1].visited_cells = {(new_x, new_y)}
-    drones[1].belief_state = Belief(env.grid_size)
-    drones[1].fire_found = drones[1].observe()
-    drones[1].history = [drones[1].state]
+        drone.position = np.array([new_x, new_y])
+        drone.visited_cells = {(new_x, new_y)}
+        drone.belief_state = Belief(env.grid_size)
+        drone.fire_found = drone.observe()
+        drone.history = [drone.state]
 
     # === Inject disturbances, x into Environment's Wind ===
     if cfg.ENABLE_WIND:
         env.wind_speed = np.random.normal(x[3], np.sqrt(x[4]))
-        env.wind_direction = x[5]*2*np.pi*np.random.random() + (1-x[5])*np.random.normal((theta_A + theta_B)/2, np.sqrt(x[6]))
+        thetas = [np.arctan2(drone.position[1] - env.fire_pos[1], drone.position[0] - env.fire_pos[0]) for drone in drones]
+        mean_theta = np.mean(thetas)
+        env.wind_direction = x[5] * 2 * np.pi * np.random.random() + (1 - x[5]) * np.random.normal(mean_theta, np.sqrt(x[6]))
 
     # Main simulation loop
     for i in range(N):
         # Bias the Dynamic Wind every 10 time steps to push the drones away from the fire
         if cfg.ENABLE_WIND and i > 0 and i % 10 == 0:
-            theta_A = np.arctan2(drones[0].position[1] - env.fire_pos[1], drones[0].position[0] - env.fire_pos[0])
-            theta_B = np.arctan2(drones[1].position[1] - env.fire_pos[1], drones[1].position[0] - env.fire_pos[0])
-            env.wind_direction = x[5]*2*np.pi*np.random.random() + (1-x[5])*np.random.normal((theta_A + theta_B)/2, np.sqrt(x[6]))
+            env.wind_speed = np.random.normal(x[3], np.sqrt(x[4]))
+            thetas = [np.arctan2(drone.position[1] - env.fire_pos[1], drone.position[0] - env.fire_pos[0]) for drone in drones]
+            mean_theta = np.mean(thetas)
+            env.wind_direction = x[5] * 2 * np.pi * np.random.random() + (1 - x[5]) * np.random.normal(mean_theta, np.sqrt(x[6]))
             if render == 1 or render == 2:
                 print(f"\tWind changed direction to {env.wind_direction*180/np.pi:.1f} degrees")
 

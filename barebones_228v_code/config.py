@@ -35,7 +35,7 @@ OBSTACLE_BUFFER_AROUND_OBJECTIVES = 2 # Number of empty cells around the objecti
 OBSTACLE_BUFFER_AROUND_START = 2 # Number of empty cells around the drone start location
 
 # ===== Drone parameters ===== 
-NUM_DRONES = 2
+NUM_DRONES = 3
 OBSERVATION_WINDOW_SIZE = 3
 LOOKAHEAD_DEPTH = 3
 
