@@ -162,15 +162,19 @@ class SearchEnv(Env):
             plt.show(block=False)
         else:
             self.im.set_data(grid)
-            # draw our science value label (how important the science is)
-            if not self.science_found:
-                sx, sy = self.science_pos
-                value_text = self.ax.text(sy, sx, str(self.science_value), ha = 'center', va = 'center', color = 'black', fontsize = 12, fontweight = 'bold', zorder = 20)
-                self.patches.append(value_text)
-
+        
+        # first we clear away our old patches
         for p in self.patches:
             p.remove()
         self.patches.clear()
+        
+        # draw our science value label (how important the science is)
+        if not self.science_found:
+            sx, sy = self.science_pos
+            value_text = self.ax.text(sy, sx, str(self.science_value), ha = 'center', va = 'center', color = 'black', fontsize = 12, fontweight = 'bold', zorder = 20)
+            self.patches.append(value_text)
+
+
         
         # Clear previous status texts
         for t in self.status_texts:

@@ -87,7 +87,7 @@ class Drone():
         elif action == 5: # Communicate
             telemetry_packet = self.create_telemetry_packet()
             self.steps_since_last_comm = 0
-        elif action == 6: # Extinguish the science
+        elif action == 6: # Collect the science
             self.env.science_collected = True
 
         self.drifted = False
