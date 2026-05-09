@@ -1,5 +1,5 @@
 """
-Environment module for multi-agent fire search simulation
+Environment module for multi-agent science search simulation
 Handles rendering, step execution, and reward computation
 """
 import numpy as np
@@ -13,12 +13,13 @@ class SearchEnv(Env):
     """Multi-agent search environment with Dec-POMDP framework"""
     def __init__(self):
         self.grid_size = 20 # The side length of the square grid-world
-        # TODO Add back in wind later if it's something we want to include
-        # self.wind_speed = 0.0 # The probability of the wind moving drones
-        # self.wind_direction = 0 # The direction the wind would bias drone movement in radians
+        self.wind_speed = 0.0 # The probability of the wind moving drones
+        self.wind_direction = 0 # The direction the wind would bias drone movement in radians
         
-        self.fire_pos = np.random.randint(0, self.grid_size, size=2) # The random 2D position of the fire
-        self.fire_extinguished = False
+        self.science_pos = np.random.randint(0, self.grid_size, size=2) # The random 2D position of the science objective
+        self.science_value = np.random.randint(1, 10) # how important the science objective is
+        self.science_found = False
+        self.science_collected = False
 
         # Obstacle stuff
         # Current setup is there's a separate set of variables for small obstacles and large obstacles
@@ -110,7 +111,7 @@ class SearchEnv(Env):
         self.reset_obstacles()
 
         if protected_cells is None:
-            protected_cells = [tuple(self.fire_pos)]
+            protected_cells = [tuple(self.science_pos)]
 
         # start with adding in all of our large obstacles
         for _ in range(num_large):
@@ -137,13 +138,13 @@ class SearchEnv(Env):
         grid[self.obstacle_grid] = 7
 
 
-        if not self.fire_extinguished:
-            grid[tuple(self.fire_pos)] = 2
+        if not self.science_found:
+            grid[tuple(self.science_pos)] = 2
 
         for idx, drone in enumerate(drones):
             grid[tuple(drone.position)] = idx + 3
 
-        cmap = colors.ListedColormap(['#ffcccc', 'white', 'red', 'blue', 'green', 'orange', 'purple', 'black'])
+        cmap = colors.ListedColormap(['#ffcccc', 'white', '#2ecc71', 'blue', 'green', 'orange', 'purple', 'black'])
         bounds = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
 
@@ -155,12 +156,17 @@ class SearchEnv(Env):
             self.ax.grid(which='minor', color='gray', linestyle='-', linewidth=1)
             self.ax.set_xlabel('Y Position')
             self.ax.set_ylabel('X Position')
-            self.ax.set_title("Multi-Agent Costly-Comms Objective Search", fontsize=12, fontweight='bold')
+            self.ax.set_title("Multi-Agent Science Objective Sear", fontsize=12, fontweight='bold')
 
             plt.ion()
             plt.show(block=False)
         else:
             self.im.set_data(grid)
+            # draw our science value label (how important the science is)
+            if not self.science_found:
+                sx, sy = self.science_pos
+                value_text = self.ax.text(sy, sx, str(self.science_value), ha = 'center', va = 'center', color = 'black', fontsize = 12, fontweight = 'bold', zorder = 20)
+                self.patches.append(value_text)
 
         for p in self.patches:
             p.remove()
@@ -172,7 +178,7 @@ class SearchEnv(Env):
         self.status_texts = []
 
         # Display Drone Info (Entropy & Action)
-        action_map = {0: 'Stay', 1: 'Right', 2: 'Left', 3: 'Up', 4: 'Down', 5: 'COMMUNICATE', 6: 'Extinguish'}
+        action_map = {0: 'Stay', 1: 'Right', 2: 'Left', 3: 'Up', 4: 'Down', 5: 'COMMUNICATE', 6: 'Collect Science'}
         
         for i, drone in enumerate(drones):
             entropy = drone.belief_state.get_entropy()

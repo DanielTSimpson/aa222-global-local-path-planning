@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 def initialize_drones(num_drones, env, window_size):
-    """Initialize drones at random positions that don't see the fire initially
+    """Initialize drones at random positions that don't see the science initially
     
     Args:
         num_drones: number of drones to create
@@ -22,8 +22,8 @@ def initialize_drones(num_drones, env, window_size):
     for drone_id in range(num_drones):
         drone = Drone(env)
 
-        # If drone observes the fire upon creation, reshuffle
-        while drone.fire_found:
+        # If drone observes the science upon creation, reshuffle
+        while drone.science_found:
             drone = Drone(env)
 
         drone.drone_id = drone_id
@@ -60,10 +60,11 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
 
     # Initialize environment
     env = SearchEnv()
-    env.fire_pos = (1, 1) # Place the fire at one corner as a fixed extreme point
+    env.science_pos = (1, 1) # Place the science at one corner as a fixed extreme point
+    env.science_value = 10
     env.grid_size = cfg.GRID_SIZE
 
-    env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA, protected_cells=[tuple(env.fire_pos)], buffer_radius = cfg.OBSTACLE_BUFFER_AROUND_OBJECTIVES)
+    env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA, protected_cells=[tuple(env.science_pos)], buffer_radius = cfg.OBSTACLE_BUFFER_AROUND_OBJECTIVES)
     
     if cfg.ENABLE_WIND:
         env.wind_speed = cfg.WIND_SPEED
@@ -88,9 +89,9 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
         old_pos = drone.position
         theta = np.random.uniform(0, np.pi / 2) # picks a random angle for the drone to start from
         distance = np.random.normal(int(cfg.GRID_SIZE * x[1]), int(cfg.GRID_SIZE * np.sqrt(x[2]))) # picks a random distance for the drone to start from
-        fire_x, fire_y = env.fire_pos # gets the fire position from the environment
-        new_x = int(x[0] * old_pos[0] + (1 - x[0]) * np.round(fire_x + distance * np.cos(theta))) 
-        new_y = int(x[0] * old_pos[1] + (1 - x[0]) * np.round(fire_y + distance * np.sin(theta)))
+        science_x, science_y = env.science_pos # gets the science position from the environment
+        new_x = int(x[0] * old_pos[0] + (1 - x[0]) * np.round(science_x + distance * np.cos(theta))) 
+        new_y = int(x[0] * old_pos[1] + (1 - x[0]) * np.round(science_y + distance * np.sin(theta)))
         new_x = max(0, min(env.grid_size - 1, new_x))
         new_y = max(0, min(env.grid_size - 1, new_y))
         
@@ -102,22 +103,22 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
         drone.position = np.array([new_x, new_y])
         drone.visited_cells = {(new_x, new_y)}
         drone.belief_state = Belief(env.grid_size)
-        drone.fire_found = drone.observe()
+        drone.science_found = drone.observe()
         drone.history = [drone.state]
 
     # === Inject disturbances, x into Environment's Wind ===
     if cfg.ENABLE_WIND:
         env.wind_speed = np.random.normal(x[3], np.sqrt(x[4]))
-        thetas = [np.arctan2(drone.position[1] - env.fire_pos[1], drone.position[0] - env.fire_pos[0]) for drone in drones]
+        thetas = [np.arctan2(drone.position[1] - env.science_pos[1], drone.position[0] - env.science_pos[0]) for drone in drones]
         mean_theta = np.mean(thetas)
         env.wind_direction = x[5] * 2 * np.pi * np.random.random() + (1 - x[5]) * np.random.normal(mean_theta, np.sqrt(x[6]))
 
     # Main simulation loop
     for i in range(N):
-        # Bias the Dynamic Wind every 10 time steps to push the drones away from the fire
+        # Bias the Dynamic Wind every 10 time steps to push the drones away from the science
         if cfg.ENABLE_WIND and i > 0 and i % 10 == 0:
             env.wind_speed = np.random.normal(x[3], np.sqrt(x[4]))
-            thetas = [np.arctan2(drone.position[1] - env.fire_pos[1], drone.position[0] - env.fire_pos[0]) for drone in drones]
+            thetas = [np.arctan2(drone.position[1] - env.science_pos[1], drone.position[0] - env.science_pos[0]) for drone in drones]
             mean_theta = np.mean(thetas)
             env.wind_direction = x[5] * 2 * np.pi * np.random.random() + (1 - x[5]) * np.random.normal(mean_theta, np.sqrt(x[6]))
             if render == 1 or render == 2:
@@ -136,12 +137,12 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
             time_to_obj = i
             break
         
-        # Check if fire is extinguished
-        if env.fire_extinguished:
+        # Check if science has been collected
+        if env.science_collected:
             failure_mode = 0
             time_to_obj = i
             if render == 1 or render == 2:
-                print(f"\tFire extinguished!")
+                print(f"\tScience collected!")
                 if render == 2:
                     env.render(drones)
                     plt.pause(5)

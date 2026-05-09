@@ -15,7 +15,7 @@ RENDER_PAUSE = 0.25
 ENABLE_WIND = False
 
 #  ===== Environment parameters ===== 
-GRID_SIZE = 25  # Size of the NxN grid
+GRID_SIZE = 40  # Size of the NxN grid
 WIND_SPEED = np.random.normal(0.05, 0.05**2) # Probability of agents drifting after an action
 WIND_DIRECTION = 2*np.pi*np.random.random() # Direction of the wind in radians (CCW)
 

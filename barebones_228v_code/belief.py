@@ -3,7 +3,7 @@ import config as cfg
 
 class Belief:
     """
-    Belief class to manage the probability distribution of the fire location.
+    Belief class to manage the probability distribution of the science location.
     """
     def __init__(self, grid_size = cfg.GRID_SIZE):
         """
@@ -32,7 +32,7 @@ class Belief:
         p = p[p > 0]
         return -np.sum(p * np.log(p))
     
-    def update_from_observation(self, drone_pos, window_size, fire_found):
+    def update_from_observation(self, drone_pos, window_size, science_found):
         """
         Bayesian update of the belief grid based on observation.
         """
@@ -44,13 +44,13 @@ class Belief:
         y_min = max(0, c - half)
         y_max = min(self.grid_size, c + half + 1)
 
-        if fire_found:
-            # If fire is found, probability is 1.0 inside the window, 0.0 outside
+        if science_found:
+            # If science is found, probability is 1.0 inside the window, 0.0 outside
             mask = np.zeros_like(self.belief_grid)
             mask[x_min:x_max, y_min:y_max] = 1.0
             self.belief_grid *= mask
         else:
-            # If no fire, probability is 0.0 inside the window
+            # If no science, probability is 0.0 inside the window
             self.belief_grid[x_min:x_max, y_min:y_max] = 0.0
 
         # Normalize to ensure sum is 1.0
