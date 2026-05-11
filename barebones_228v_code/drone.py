@@ -1,6 +1,6 @@
 """
 Drone module for Dec-POMDP multi-agent system
-Implements intelligent decision-making for fire search and extinguish
+Implements intelligent decision-making for science search and extinguish
 """
 import numpy as np
 from copy import deepcopy
@@ -16,7 +16,11 @@ class Drone():
         self.drone_id = 0
         self.window_size = 0
         self.env = environment
-        self.position = np.random.randint(0, self.env.grid_size, size=2)
+        # making sure our drone doesn't spawn inside of an obstacle
+        while True:
+            self.position = np.random.randint(0, self.env.grid_size, size = 2)
+            if not self.env.is_obstacle(self.position[0], self.position[1]):
+                break
         self.budget = cfg.MAX_BUDGET
         self.belief_state = Belief(self.env.grid_size)
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
@@ -25,7 +29,7 @@ class Drone():
         self.visited_cells = set() # Track the global visited cells
         self.steps_since_last_comm = 0
         self.last_action = None
-        self.fire_found = False
+        self.science_found = False
         self.drifted = False
         self.history = []
         self.stuck_count = 0
@@ -37,7 +41,7 @@ class Drone():
         self.comm_cost = 0.0
         self.time_cost = 0.0
         
-        self.fire_found = self.observe()
+        self.science_found = self.observe()
         if not self.history:
             self.history.append(self.state)
         
@@ -51,7 +55,7 @@ class Drone():
 
     @property
     def state(self):
-        return [self.x, self.y, self.fire_found]
+        return [self.x, self.y, self.science_found]
 
 
     def action(self, action):
@@ -83,13 +87,13 @@ class Drone():
         elif action == 5: # Communicate
             telemetry_packet = self.create_telemetry_packet()
             self.steps_since_last_comm = 0
-        elif action == 6: # Extinguish the Fire
-            self.env.fire_extinguished = True
+        elif action == 6: # Collect the science
+            self.env.science_collected = True
 
         self.drifted = False
         # Apply wind drift
 
-        if np.random.random() < abs(self.env.wind_speed):
+        if cfg.ENABLE_WIND and np.random.random() < abs(self.env.wind_speed):
             cos_wind = np.cos(self.env.wind_direction)
             sin_wind = np.sin(self.env.wind_direction)
             
@@ -101,14 +105,25 @@ class Drone():
                 x = max(0, min(self.env.grid_size - 1, x + dx))
                 y = max(0, min(self.env.grid_size - 1, y + dy))
 
+            # quick obstacle collision check
+            if self.env.obstacle_grid[x, y] == 1:
+                x, y = prev_position
+
         self.position = np.array([x, y])
+        
+        # candidate position after our intended action / if the wind is blowing
+        candidate = np.array([x,y])
+        # we're using that candidate position to prevent the drone from moving into any obstacles
+        if self.env.is_obstacle(candidate[0], candidate[1]):
+            candidate = prev_position
+            self.position = candidate # no need to rewrite self.position if we don't end up in an obstacle with our projected plan
         
         if np.array_equal(self.position, prev_position):
             self.stuck_count += 1
         else:
             self.stuck_count = 0
             
-        if not self.env.fire_extinguished: self.fire_found = self.observe() # Observe for free after every action
+        if not self.env.science_collected: self.science_found = self.observe() # Observe for free after every action
         self.history.append(self.state)     
         self.time += 1
         self.steps_since_last_comm += 1
@@ -118,11 +133,11 @@ class Drone():
 
     def observe(self):
         """Update belief based on observation"""
-        x_check = (self.x - self.window_size // 2 <= self.env.fire_pos[0] <= self.x + self.window_size // 2)
-        y_check = (self.y - self.window_size // 2 <= self.env.fire_pos[1] <= self.y + self.window_size // 2)
-        fire_observed = x_check and y_check
+        x_check = (self.x - self.window_size // 2 <= self.env.science_pos[0] <= self.x + self.window_size // 2)
+        y_check = (self.y - self.window_size // 2 <= self.env.science_pos[1] <= self.y + self.window_size // 2)
+        science_observed = x_check and y_check
         
-        self.belief_state.update_from_observation(self.position, self.window_size, fire_observed)        
+        self.belief_state.update_from_observation(self.position, self.window_size, science_observed)        
         
         # Update visited_cells to include all observed cells
         half = self.window_size // 2
@@ -132,23 +147,23 @@ class Drone():
             for c in range(y_min, y_max):
                 self.visited_cells.add((r, c))
         
-        if fire_observed: 
-            #print(f"Drone {self.drone_id} found fire at position {self.env.fire_pos}!")
+        if science_observed: 
+            print(f"Drone {self.drone_id} found science objective at position {self.env.science_pos}!")
             
-            if np.array_equal(self.position, self.env.fire_pos):
-                self.action(6) # Extinguish the fire
+            if np.array_equal(self.position, self.env.science_pos):
+                self.action(6) # Collect the science
 
-            else: # Move towards the fire
-                if self.x < self.env.fire_pos[0]:
+            else: # Move towards the science
+                if self.x < self.env.science_pos[0]:
                     self.action(4)
-                elif self.x > self.env.fire_pos[0]:
+                elif self.x > self.env.science_pos[0]:
                     self.action(3)
-                elif self.y < self.env.fire_pos[1]:
+                elif self.y < self.env.science_pos[1]:
                     self.action(1)
-                elif self.y > self.env.fire_pos[1]:
+                elif self.y > self.env.science_pos[1]:
                     self.action(2)
 
-        return fire_observed
+        return science_observed
 
 
     def create_telemetry_packet(self):
@@ -197,15 +212,15 @@ class Drone():
             bonus = self.exploration_bonus if new_cells > 0 else 0
             reward_action = bonus - self.movement_cost - self.time_cost
             
-            prob_see_fire = np.sum(belief.belief_grid[x_min:x_max, y_min:y_max])
-            prob_see_nothing = 1.0 - prob_see_fire
+            prob_see_science = np.sum(belief.belief_grid[x_min:x_max, y_min:y_max])
+            prob_see_nothing = 1.0 - prob_see_science
             
             # U(b'| o = Fire) - Immediate high value (entropy reduction)
-            gain_see_fire = current_entropy
+            gain_see_science = current_entropy
             
             # U(b'| o = Nothing)
             temp_belief = belief.copy()
-            temp_belief.update_from_observation((nx, ny), self.window_size, fire_found=False)
+            temp_belief.update_from_observation((nx, ny), self.window_size, science_found=False)
             gain_see_nothing = current_entropy - temp_belief.get_entropy()
             
             # Recursive Value
@@ -219,7 +234,7 @@ class Drone():
             
             # Q(b, a)
             val_nothing = gain_see_nothing + self.gamma * future_val
-            q = reward_action + self.gamma * (prob_see_fire * gain_see_fire + prob_see_nothing * val_nothing)
+            q = reward_action + self.gamma * (prob_see_science * gain_see_science + prob_see_nothing * val_nothing)
             
             if q > max_q:
                 max_q = q
@@ -256,17 +271,17 @@ class Drone():
             reward_action = bonus - self.movement_cost - self.time_cost
             
             # P(o = Fire)
-            prob_see_fire = np.sum(self.belief_state.belief_grid[x_min:x_max, y_min:y_max])
+            prob_see_science = np.sum(self.belief_state.belief_grid[x_min:x_max, y_min:y_max])
             
             # P(o = Nothing)
-            prob_see_nothing = 1.0 - prob_see_fire
+            prob_see_nothing = 1.0 - prob_see_science
             
             # U(b'| o = Fire)
-            gain_see_fire = current_entropy
+            gain_see_science = current_entropy
 
             # U(b'| o = Nothing)
             temp_belief = self.belief_state.copy()
-            temp_belief.update_from_observation((nx, ny), self.window_size, fire_found=False)
+            temp_belief.update_from_observation((nx, ny), self.window_size, science_found=False)
             gain_see_nothing = current_entropy - temp_belief.get_entropy()
             
             # --- Future Value (Lookahead) ---
@@ -280,12 +295,8 @@ class Drone():
 
             # Q(b, a) = R(b, a) + \gamma*\sum(P(o|b, a)*U(b))
             val_nothing = gain_see_nothing + self.gamma * future_val
-            q_value = reward_action + self.gamma*(prob_see_fire*gain_see_fire + prob_see_nothing*val_nothing)
-            
-            #print(f"Time step {self.time} | Action {action_idx} | Reward: {reward_action:.2f} | Q-Value: {q_value:.2f}")
-            #print(f"\tP(o = Fire):    {prob_see_fire:.6f}\tU(b'| o = Fire):    {gain_see_fire:.4f}")
-            #print(f"\tP(o = Nothing): {prob_see_nothing:.6f}\tU(b'| o = Nothing): {val_nothing:.4f} (Inc. Future: {future_val:.2f})")
-            
+            q_value = reward_action + self.gamma*(prob_see_science*gain_see_science + prob_see_nothing*val_nothing)
+
             if q_value > max_q_value:
                 max_q_value = q_value
                 best_actions = [action_idx]
