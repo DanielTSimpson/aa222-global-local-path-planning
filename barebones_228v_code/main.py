@@ -60,7 +60,7 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
 
     # Initialize environment
     env = SearchEnv()
-    env.science_pos = (1, 1) # Place the science at one corner as a fixed extreme point
+    env.science_pos = np.array((1, 1), dtype=np.int64) # Place the science at one corner as a fixed extreme point
     env.science_value = 10
     env.grid_size = cfg.GRID_SIZE
 
@@ -189,7 +189,10 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     return failure_mode, total_cost, total_time, stuck_count
 
 if __name__ == '__main__':
-    mu_q = cfg.MU_Q
+    # TODO: Implement obstacle handling in Drone's POMDP
+    # TODO: Implement A-star to generate a global path
+    # TODO: Implement small obstacles
+    # TODO: Make the drone's observation window forward facing 
+        # This implies TODO: Add orientation to the drone's position
     mu_p = cfg.MU_P
-    
-    run_simulation(x = mu_q, render=2, save_gif=False)
+    run_simulation(x = mu_p.tolist(), render=2, save_gif=False)

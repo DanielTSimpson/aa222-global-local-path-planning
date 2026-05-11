@@ -9,7 +9,7 @@ INITIAL_TIME = 0.0
 TIME_STEP = 0.05
 MAX_SIMULATION_TIME = 250.0
 MAX_BUDGET = 5000
-RENDER_PAUSE = 0.25
+RENDER_PAUSE = 0.05
 
 # Wind Toggle
 ENABLE_WIND = False
@@ -21,8 +21,8 @@ WIND_DIRECTION = 2*np.pi*np.random.random() # Direction of the wind in radians (
 
 # ===== Obstacle parameters ===== 
 OBSTACLES_ENABLED = True # I figure it's nice to be able to toggle this when testing our path planning
-NUM_LARGE_OBSTACLES = 10 # TODO could be good later to have our number of obstacles be a function of the size of the grid
-NUM_SMALL_OBSTACLES = 20
+NUM_LARGE_OBSTACLES = GRID_SIZE // 4 
+NUM_SMALL_OBSTACLES = GRID_SIZE // 2
 
 LARGE_OBSTACLE_SIZE_MU = 4 # Mean size of the larger obstacles -- I think that having the required size for visibility by the overhead agent be ~3 cells is a good place to start
 LARGE_OBSTACLE_SIZE_SIGMA = 1 # Standard deviation of the large obstacle size
@@ -35,7 +35,7 @@ OBSTACLE_BUFFER_AROUND_OBJECTIVES = 2 # Number of empty cells around the objecti
 OBSTACLE_BUFFER_AROUND_START = 2 # Number of empty cells around the drone start location
 
 # ===== Drone parameters ===== 
-NUM_DRONES = 3
+NUM_DRONES = 1
 OBSERVATION_WINDOW_SIZE = 3
 LOOKAHEAD_DEPTH = 3
 

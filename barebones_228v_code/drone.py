@@ -296,11 +296,7 @@ class Drone():
             # Q(b, a) = R(b, a) + \gamma*\sum(P(o|b, a)*U(b))
             val_nothing = gain_see_nothing + self.gamma * future_val
             q_value = reward_action + self.gamma*(prob_see_science*gain_see_science + prob_see_nothing*val_nothing)
-            
-            #print(f"Time step {self.time} | Action {action_idx} | Reward: {reward_action:.2f} | Q-Value: {q_value:.2f}")
-            #print(f"\tP(o = Fire):    {prob_see_fire:.6f}\tU(b'| o = Fire):    {gain_see_fire:.4f}")
-            #print(f"\tP(o = Nothing): {prob_see_nothing:.6f}\tU(b'| o = Nothing): {val_nothing:.4f} (Inc. Future: {future_val:.2f})")
-            
+
             if q_value > max_q_value:
                 max_q_value = q_value
                 best_actions = [action_idx]

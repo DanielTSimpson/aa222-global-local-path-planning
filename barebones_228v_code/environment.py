@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import matplotlib.patches as patches
+
 from gymnasium import Env
 import imageio
 
@@ -14,7 +15,7 @@ class SearchEnv(Env):
     def __init__(self):
         self.grid_size = 20 # The side length of the square grid-world
         self.wind_speed = 0.0 # The probability of the wind moving drones
-        self.wind_direction = 0 # The direction the wind would bias drone movement in radians
+        self.wind_direction = 0.0 # The direction the wind would bias drone movement in radians
         
         self.science_pos = np.random.randint(0, self.grid_size, size=2) # The random 2D position of the science objective
         self.science_value = np.random.randint(1, 10) # how important the science objective is
@@ -171,6 +172,7 @@ class SearchEnv(Env):
         # draw our science value label (how important the science is)
         if not self.science_found:
             sx, sy = self.science_pos
+            assert self.ax is not None
             value_text = self.ax.text(sy, sx, str(self.science_value), ha = 'center', va = 'center', color = 'black', fontsize = 12, fontweight = 'bold', zorder = 20)
             self.patches.append(value_text)
 
@@ -200,6 +202,7 @@ class SearchEnv(Env):
                 status_str += " | DRIFTED!"
             
             # Place text below the plot
+            assert self.ax is not None
             t = self.ax.text(0.05, -0.12 - (i * 0.06), status_str, 
                              transform=self.ax.transAxes, fontsize=10, 
                              color=text_color, fontweight=font_weight,
@@ -227,6 +230,7 @@ class SearchEnv(Env):
                 edgecolor='black',
                 facecolor='none'
             )
+            assert self.ax is not None
             self.ax.add_patch(rectangle)
             self.patches.append(rectangle)
         
@@ -234,8 +238,12 @@ class SearchEnv(Env):
         self.fig.canvas.flush_events()
 
         if self.record_frames:
+            from matplotlib.backends.backend_agg import FigureCanvasAgg
+            canvas = self.fig.canvas
+            assert isinstance(canvas, FigureCanvasAgg)
+            buf = canvas.buffer_rgba()
             # Use buffer_rgba() as tostring_rgb() is deprecated/removed in newer Matplotlib
-            image = np.frombuffer(self.fig.canvas.buffer_rgba(), dtype='uint8')
+            image = np.frombuffer(buf, dtype='uint8')
             
             # Handle HiDPI scaling by calculating actual buffer dimensions
             w, h = self.fig.canvas.get_width_height()
