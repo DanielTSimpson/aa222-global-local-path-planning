@@ -184,18 +184,16 @@ class SearchEnv(Env):
         self.status_texts = []
 
         # Display Drone Info (Entropy & Action)
-        action_map = {0: 'Stay', 1: 'Right', 2: 'Left', 3: 'Up', 4: 'Down', 5: 'COMMUNICATE', 6: 'Collect Science'}
+        action_map = {0: 'Stay', 1: 'Right', 2: 'Left', 3: 'Up', 4: 'Down', 6: 'Collect Science'}
         
         for i, drone in enumerate(drones):
             entropy = drone.belief_state.get_entropy()
             action_code = drone.last_action
             action_str = action_map.get(action_code, "None")
             
-            # Formatting for Communicate
-            is_comm = (action_code == 5)
-            text_color = 'red' if is_comm else 'black'
-            font_weight = 'bold' if is_comm else 'normal'
-            bg_color = 'yellow' if is_comm else 'white'
+            text_color = 'black' 
+            font_weight = 'normal' 
+            bg_color = 'white' 
             
             status_str = f"Drone {drone.drone_id} | H: {entropy:.3f} | Action: {action_str}"
             if drone.drifted:

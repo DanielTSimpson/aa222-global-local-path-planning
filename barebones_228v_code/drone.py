@@ -27,7 +27,6 @@ class Drone():
         
         self.time = 0
         self.visited_cells = set() # Track the global visited cells
-        self.steps_since_last_comm = 0
         self.last_action = None
         self.science_found = False
         self.drifted = False
@@ -38,7 +37,6 @@ class Drone():
         self.gamma = 0.0
         self.exploration_bonus = 0.0 
         self.movement_cost = 0.0
-        self.comm_cost = 0.0
         self.time_cost = 0.0
         
         self.science_found = self.observe()
@@ -66,15 +64,12 @@ class Drone():
         step_cost = self.time_cost
         if action in [1, 2, 3, 4]: # Movement actions
             step_cost += self.movement_cost
-        elif action == 5: # Communication action
-            step_cost += self.comm_cost
         self.budget -= step_cost
 
         prev_position = self.position.copy()
 
         x = self.x
         y = self.y
-        telemetry_packet = None
         
         if action == 1:  # Up
             y = min(self.env.grid_size - 1, self.y + 1)
@@ -84,15 +79,12 @@ class Drone():
             x = max(0, self.x - 1)
         elif action == 4:  # Right
             x = min(self.env.grid_size - 1, self.x + 1)
-        elif action == 5: # Communicate
-            telemetry_packet = self.create_telemetry_packet()
-            self.steps_since_last_comm = 0
         elif action == 6: # Collect the science
             self.env.science_collected = True
 
         self.drifted = False
-        # Apply wind drift
 
+        # Apply wind drift
         if cfg.ENABLE_WIND and np.random.random() < abs(self.env.wind_speed):
             cos_wind = np.cos(self.env.wind_direction)
             sin_wind = np.sin(self.env.wind_direction)
@@ -110,7 +102,6 @@ class Drone():
                 x, y = prev_position
 
         self.position = np.array([x, y])
-        
         # candidate position after our intended action / if the wind is blowing
         candidate = np.array([x,y])
         # we're using that candidate position to prevent the drone from moving into any obstacles
@@ -126,9 +117,6 @@ class Drone():
         if not self.env.science_collected: self.science_found = self.observe() # Observe for free after every action
         self.history.append(self.state)     
         self.time += 1
-        self.steps_since_last_comm += 1
-
-        return telemetry_packet
 
 
     def observe(self):
@@ -165,26 +153,6 @@ class Drone():
 
         return science_observed
 
-
-    def create_telemetry_packet(self):
-        """Creates telemetry packet with belief state"""
-        packet = {
-            'sender_id': self.drone_id,
-            'timestamp': self.time,
-            'position': self.position.copy(),
-            'belief_state': self.belief_state.copy(),
-            'visited_cells': self.visited_cells.copy(),
-            'history': deepcopy(self.history)
-        }
-        return packet
-
-
-    def receive_telemetry(self, packet, communication_noise=0.1):
-        """Receive and merge belief states"""
-        other_visited = packet['visited_cells']
-        self.visited_cells.update(other_visited)
-        if 'belief_state' in packet:
-            self.belief_state.merge(packet['belief_state'])
 
 
     def _get_best_value(self, belief, position, visited, depth):
@@ -304,28 +272,5 @@ class Drone():
                 best_actions.append(action_idx)
 
         best_action = int(np.random.choice(best_actions))
-# --- Check the Q-value for performing communication ---
-        
-        # R(b, a = communicate)
-        reward_comm = -self.comm_cost - self.time_cost
-
-        # U(b' | a = communicate)
-        max_entropy = np.log(self.env.grid_size * self.env.grid_size)
-        information_possessed = max(0.0, 2*(max_entropy - current_entropy))
-        
-        # Staleness factor forces gain to 0 immediately after communicating, 
-        # and asymptotically approaches 1.0 as time passes.
-        decay_rate = 0.8
-        staleness_factor = 1.0 - (decay_rate ** self.steps_since_last_comm)
-        
-        estimated_comm_gain = information_possessed * staleness_factor
-
-        # Q(b, a = communicate)
-        # Add future value (approximated by max_q_value since state doesn't change)
-        q_comm = reward_comm + estimated_comm_gain + self.gamma * max_q_value
-
-        # Only communicate if it's better than moving AND provides tangible information gain
-        if q_comm > max_q_value and estimated_comm_gain > 0.5:
-            return 5
             
         return best_action

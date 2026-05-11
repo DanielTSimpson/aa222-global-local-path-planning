@@ -31,7 +31,6 @@ def initialize_drones(num_drones, env, window_size):
         drone.gamma = cfg.GAMMA
         drone.exploration_bonus = cfg.EXPLORATION_BONUS 
         drone.movement_cost = cfg.MOVEMENT_COST
-        drone.comm_cost = cfg.COMMUNICATION_COST
         drone.time_cost = cfg.TIME_COST    
 
         drones.append(drone)
@@ -83,7 +82,6 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
 
     failure_mode = 2 # Default to "Out of Time"
     time_to_obj = N
-    total_comms = 0
     
     for drone in drones:
         old_pos = drone.position
@@ -155,8 +153,6 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
             packet = drone.action(action)
             if packet:
                 packets.append(packet)
-        
-        total_comms += len(packets)
         
         # Exchange packets between drones
         for packet in packets:
