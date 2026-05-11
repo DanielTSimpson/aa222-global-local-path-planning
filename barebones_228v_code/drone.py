@@ -21,7 +21,7 @@ class Drone():
             self.position = np.random.randint(0, self.env.grid_size, size = 2)
             if not self.env.is_obstacle(self.position[0], self.position[1]):
                 break
-        self.budget = cfg.MAX_BUDGET
+        self.budget = cfg.MAX_BUDGET_PER_DRONE
         self.belief_state = Belief(self.env.grid_size)
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
         
@@ -79,7 +79,7 @@ class Drone():
             x = max(0, self.x - 1)
         elif action == 4:  # Right
             x = min(self.env.grid_size - 1, self.x + 1)
-        elif action == 6: # Collect the science
+        elif action == 5: # Collect the science
             self.env.science_collected = True
 
         self.drifted = False
@@ -139,7 +139,7 @@ class Drone():
             print(f"Drone {self.drone_id} found science objective at position {self.env.science_pos}!")
             
             if np.array_equal(self.position, self.env.science_pos):
-                self.action(6) # Collect the science
+                self.action(5) # Collect the science
 
             else: # Move towards the science
                 if self.x < self.env.science_pos[0]:

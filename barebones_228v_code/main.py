@@ -49,7 +49,6 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     Returns:
         None
     """
-    #print(f"Running Trial {trial_num}")
     # Initialize simulation parameters
     t_0 = cfg.INITIAL_TIME
     dt = cfg.TIME_STEP
@@ -74,14 +73,11 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     if save_gif:
         env.record_frames = True
 
-    
-
     # Initialize the drones
     drone_window_size = cfg.OBSERVATION_WINDOW_SIZE
     drones = initialize_drones(cfg.NUM_DRONES, env, drone_window_size)
 
     failure_mode = 2 # Default to "Out of Time"
-    time_to_obj = N
     
     for drone in drones:
         old_pos = drone.position
@@ -147,18 +143,9 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
             break
         
         # Dec-POMDP decision making and execution
-        packets = []
         for drone in drones:
-            action = drone.decide_action_pomdp()
-            packet = drone.action(action)
-            if packet:
-                packets.append(packet)
-        
-        # Exchange packets between drones
-        for packet in packets:
-            for drone in drones:
-                if drone.drone_id != packet['sender_id']:
-                    drone.receive_telemetry(packet)
+            best_action = drone.decide_action_pomdp()
+            drone.action(best_action)
         
         # Check for stuck failure (Mode 3)
         if any(d.stuck_count >= 20 for d in drones):
@@ -170,19 +157,18 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
 
     if failure_mode == 2 and (render == 1 or render == 2):
         print("\tFAILURE: Exceeded max sim time")
-
-    # Calculate Total Cost (MAX_BUDGET - remaining budget)
-    final_min_budget = min(d.budget for d in drones)
-    total_cost = cfg.MAX_BUDGET - final_min_budget
-    total_time = time_to_obj*dt
-    stuck_count = max(d.stuck_count for d in drones)
     
     if save_gif:
         gif_fps = int(2.0 / cfg.RENDER_PAUSE) if cfg.RENDER_PAUSE > 0 else 10
         env.save_gif(f"simulation_trial_{trial_num}.gif", fps=gif_fps)
 
     env.close()
-    return failure_mode, total_cost, total_time, stuck_count
+
+
+def optimize():
+    # Placeholder for a future optimization scheme
+    return None
+
 
 if __name__ == '__main__':
     # TODO: Implement obstacle handling in Drone's POMDP
@@ -192,3 +178,4 @@ if __name__ == '__main__':
         # This implies TODO: Add orientation to the drone's position
     mu_p = cfg.MU_P
     run_simulation(x = mu_p.tolist(), render=2, save_gif=False)
+    optimize()

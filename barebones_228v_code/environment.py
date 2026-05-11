@@ -116,14 +116,14 @@ class SearchEnv(Env):
 
         # start with adding in all of our large obstacles
         for _ in range(num_large):
-            h = self._sample_obstacle_size(large_mu, large_sigma, min_size = 2)
-            w = self._sample_obstacle_size(large_mu, large_sigma, min_size = 2)
+            h = self._sample_obstacle_size(large_mu, large_sigma, min_size = 3)
+            w = self._sample_obstacle_size(large_mu, large_sigma, min_size = 3)
             self.add_rectangle_obstacle(h, w, protected_cells, buffer_radius)
 
         # now we add in our small obstacles
         for _ in range(num_small):
-            h = self._sample_obstacle_size(small_mu, small_sigma, min_size = 1, max_size = 3)
-            w = self._sample_obstacle_size(small_mu, small_sigma, min_size = 1, max_size = 3)
+            h = self._sample_obstacle_size(small_mu, small_sigma, min_size = 1, max_size = 2)
+            w = self._sample_obstacle_size(small_mu, small_sigma, min_size = 1, max_size = 2)
             self.add_rectangle_obstacle(h, w, protected_cells, buffer_radius)
 
         return self.obstacles

@@ -4,13 +4,6 @@ Configuration file for Dec-POMDP multi-agent simulation
 Centralized place for all simulation parameters
 """
 
-# ===== Simulation (main) parameters ===== 
-INITIAL_TIME = 0.0
-TIME_STEP = 0.05
-MAX_SIMULATION_TIME = 250.0
-MAX_BUDGET = 5000
-RENDER_PAUSE = 0.05
-
 #  ===== Environment parameters ===== 
 GRID_SIZE = 40  # Size of the NxN grid
 ENABLE_WIND = False # Wind Toggle
@@ -44,6 +37,13 @@ EXPLORATION_BONUS = 50.0  # Bonus reward for exploring new cells, promotes activ
 # === Cost parameters ===
 MOVEMENT_COST = 1.0
 TIME_COST = 3.0
+
+# ===== Simulation (main) parameters ===== 
+INITIAL_TIME = 0.0
+TIME_STEP = 0.05
+MAX_SIMULATION_TIME = 250.0
+MAX_BUDGET_PER_DRONE = 5000 * NUM_DRONES
+RENDER_PAUSE = 0.05
 
 # Initial, nominal parameters
 # Order: [W_dist, mu_dist, var_dist, mu_wind, var_wind, W_angle, var_wind_angle_change]
