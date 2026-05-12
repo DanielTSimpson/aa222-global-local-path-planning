@@ -69,7 +69,7 @@ class SearchEnv(Env):
         return self.the_grid[r, c] == self.terrain["BUFFER ZONE"]
 
 
-    def _sample_obstacle_size(self, mu, sigma, min_size = 1, max_size = 5):
+    def _sample_obstacle_size(self, mu, sigma, min_size = 1, max_size = None):
         # lets us draw obstacle sizes from the small or large obstacle size distributions we define in the config file
         if max_size is None:
             max_size = max(1, self.grid_size // 4) # makes it so we don't go a lil too crazy with oversized obstacles
