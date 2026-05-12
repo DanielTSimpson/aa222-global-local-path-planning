@@ -58,11 +58,10 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
 
     # Initialize environment
     env = SearchEnv()
-    env.science_pos = np.array((1, 1), dtype=np.int64) # Place the science at one corner as a fixed extreme point
     env.science_value = 10
     env.grid_size = cfg.GRID_SIZE
 
-    env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA, protected_cells=[tuple(env.science_pos)], buffer_radius = cfg.OBSTACLE_BUFFER_AROUND_OBJECTIVES)
+    env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA)
     
     if cfg.ENABLE_WIND:
         env.wind_speed = cfg.WIND_SPEED
@@ -78,27 +77,12 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     drones = initialize_drones(cfg.NUM_DRONES, env, drone_window_size)
 
     failure_mode = 2 # Default to "Out of Time"
-    
-    for drone in drones:
-        old_pos = drone.position
-        theta = np.random.uniform(0, np.pi / 2) # picks a random angle for the drone to start from
-        distance = np.random.normal(int(cfg.GRID_SIZE * x[1]), int(cfg.GRID_SIZE * np.sqrt(x[2]))) # picks a random distance for the drone to start from
-        science_x, science_y = env.science_pos # gets the science position from the environment
-        new_x = int(x[0] * old_pos[0] + (1 - x[0]) * np.round(science_x + distance * np.cos(theta))) 
-        new_y = int(x[0] * old_pos[1] + (1 - x[0]) * np.round(science_y + distance * np.sin(theta)))
-        new_x = max(0, min(env.grid_size - 1, new_x))
-        new_y = max(0, min(env.grid_size - 1, new_y))
         
-        # we want to make sure we avoid spawning our drones inside obstacles, which is what this little loop does
-        while env.is_obstacle(new_x, new_y):
-            new_x = np.random.randint(0, env.grid_size)
-            new_y = np.random.randint(0, env.grid_size)
-        
-        drone.position = np.array([new_x, new_y])
-        drone.visited_cells = {(new_x, new_y)}
-        drone.belief_state = Belief(env.grid_size)
-        drone.science_found = drone.observe()
-        drone.history = [drone.state]
+    drone.position = np.array([new_x, new_y])
+    drone.visited_cells = {(new_x, new_y)}
+    drone.belief_state = Belief(env.grid_size)
+    drone.science_found = drone.observe()
+    drone.history = [drone.state]
 
     # === Inject disturbances, x into Environment's Wind ===
     if cfg.ENABLE_WIND:
