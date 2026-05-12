@@ -16,11 +16,7 @@ class Drone():
         self.drone_id = 0
         self.window_size = 0
         self.env = environment
-        # making sure our drone doesn't spawn inside of an obstacle
-        while True:
-            self.position = np.random.randint(0, self.env.grid_size, size = 2)
-            if not self.env.is_obstacle(self.position[0], self.position[1]):
-                break
+        self.position = np.array([environment.grid_size, environment.grid_size])
         self.budget = cfg.MAX_BUDGET_PER_DRONE
         self.belief_state = Belief(self.env.grid_size)
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH

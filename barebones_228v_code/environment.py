@@ -13,8 +13,8 @@ import imageio
 
 class SearchEnv(Env):
     """Multi-agent search environment with Dec-POMDP framework"""
-    def __init__(self):
-        self.grid_size = 20 # The side length of the square grid-world
+    def __init__(self, grid_size=20):
+        self.grid_size = grid_size # The side length of the square grid-world
         self.wind_speed = 0.0 # The probability of the wind moving drones
         self.wind_direction = 0.0 # The direction the wind would bias drone movement in radians
         self.terrain = {"FREE": 0, "OBJECTIVE": 1, "BUFFER ZONE": 2, "LARGE OBSTACLE": 3, "SMALL OBSTACLE": 4}
@@ -28,6 +28,10 @@ class SearchEnv(Env):
         self.science_value = np.random.randint(1, 10) # how important the science objective is
         self.science_found = False
         self.science_collected = False
+
+        # Start zone definition
+        self.the_grid[self.grid_size : self.grid_size - 5, 
+                      self.grid_size : self.grid_size - 5] = self.terrain["BUFFER ZONE"]
 
         self.patches = []
         self.fig, self.ax = None, None
