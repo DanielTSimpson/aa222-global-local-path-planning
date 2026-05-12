@@ -30,8 +30,8 @@ class SearchEnv(Env):
         self.science_collected = False
 
         # Start zone definition
-        self.the_grid[self.grid_size : self.grid_size - 5, 
-                      self.grid_size : self.grid_size - 5] = self.terrain["BUFFER ZONE"]
+        self.the_grid[self.grid_size - 5 : self.grid_size, 
+                      self.grid_size - 5 : self.grid_size] = self.terrain["BUFFER ZONE"]
 
         self.patches = []
         self.fig, self.ax = None, None

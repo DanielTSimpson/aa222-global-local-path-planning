@@ -142,10 +142,10 @@ def optimize():
 
 
 if __name__ == '__main__':
-    # TODO: Implement obstacle handling in Drone's POMDP
     # TODO: Implement A-star to generate a global path
     # TODO: Make the drone's observation window forward facing 
-        # This implies TODO: Add orientation to the drone's position
+        # This implies TODO: Add orientation to the drone's state
+    # TODO: Remove exploration POMDP and implement obstacle handling instead
     mu_p = cfg.MU_P
     run_simulation(x = mu_p.tolist(), render=2, save_gif=False)
     optimize()
