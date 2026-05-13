@@ -3,6 +3,7 @@ import config as cfg
 from environment import SearchEnv
 from drone import Drone
 from belief import Belief
+from gps import GPS
 import matplotlib.pyplot as plt
 
 
@@ -34,7 +35,7 @@ def initialize_drone(env, window_size):
     return drone
 
 
-def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
+def simulate_pomdp(x:list = [], trial_num = 0, render=0, save_gif=False):
     """
     Run the complete Dec-POMDP multi-agent simulation
     Args:
@@ -52,7 +53,7 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     render_pause = cfg.RENDER_PAUSE if render else 0.0
     N = int((t_f - t_0) / dt)
 
-    # Initialize environment
+    ### Initialize environment
     env = SearchEnv(grid_size=cfg.GRID_SIZE)
     env.science_value = 10
 
@@ -67,9 +68,10 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     if save_gif:
         env.record_frames = True
 
-    # Initialize the drones
+    ### Initialize the drone
     drone_window_size = cfg.OBSERVATION_WINDOW_SIZE
     drone = initialize_drone(env, drone_window_size)
+    
 
     failure_mode = 2 # Default to "Out of Time"
     time_to_obj = 0
@@ -136,6 +138,84 @@ def run_simulation(x:list = [], trial_num = 0, render=0, save_gif=False):
     env.close()
 
 
+def simulate_astar(trial_num = 0, render=0, save_gif=False):
+    # Initialize simulation parameters
+    t_0 = cfg.INITIAL_TIME
+    dt = cfg.TIME_STEP
+    t_f = cfg.MAX_SIMULATION_TIME
+    render_pause = cfg.RENDER_PAUSE if render else 0.0
+    N = int((t_f - t_0) / dt)
+
+    ### Initialize environment
+    env = SearchEnv(grid_size=cfg.GRID_SIZE)
+    env.science_value = 10
+
+    env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA)
+    
+    if save_gif:
+        env.record_frames = True
+
+    ### Initialize the drone
+    drone_window_size = cfg.OBSERVATION_WINDOW_SIZE
+    drone = initialize_drone(env, drone_window_size)
+
+    ### Initialize the GPS
+    gps = GPS(env, drone)
+    reconstructed_path, drone_instructions = gps.a_star()
+    
+    if drone_instructions is None:
+        if render: print("\tFAILURE: GPS A* failed to find a path.")
+        return
+
+
+
+    failure_mode = 2 # Default to "Out of Time"
+    time_to_obj = 0
+
+    for i in range(N):
+        if render == 2 or save_gif:
+            env.render([drone])
+            if render == 2:
+                plt.pause(render_pause)
+        
+        # Check for budget failure (Mode 1)
+        if drone.budget <= 0:
+            failure_mode = 1
+            if render == 1 or render == 2: print("\tFAILURE: Max budget exceeded")
+            time_to_obj = i
+            break
+        
+        # Check if science has been collected
+        if env.science_collected:
+            failure_mode = 0
+            time_to_obj = i
+            if render == 1 or render == 2:
+                print(f"\tScience collected! Completed in {time_to_obj*dt} time units")
+                if render == 2:
+                    env.render([drone])
+                    plt.pause(5)
+            break
+        
+        drone.action(drone_instructions[i]) if i < len(drone_instructions) else drone.action(1)
+        
+        # Check for stuck failure (Mode 3)
+        if drone.stuck_count >= 20:
+            failure_mode = 3
+            time_to_obj = i
+            if render == 1 or render == 2:
+                print("\tFAILURE: Drones got Stuck")
+            break
+
+    if failure_mode == 2 and (render == 1 or render == 2):
+        print("\tFAILURE: Exceeded max sim time")
+    
+    if save_gif:
+        gif_fps = int(2.0 / cfg.RENDER_PAUSE) if cfg.RENDER_PAUSE > 0 else 10
+        env.save_gif(f"simulation_trial_{trial_num}.gif", fps=gif_fps)
+
+    env.close()
+
+
 def optimize():
     # Placeholder for a future optimization scheme
     return None
@@ -147,5 +227,7 @@ if __name__ == '__main__':
         # This implies TODO: Add orientation to the drone's state
     # TODO: Remove exploration POMDP and implement obstacle handling instead
     mu_p = cfg.MU_P
-    run_simulation(x = mu_p.tolist(), render=2, save_gif=False)
+    #simulate_pomdp(x = mu_p.tolist(), render=2, save_gif=False)
+    simulate_astar(render = 2)
+    plt.show(block=True)
     optimize()

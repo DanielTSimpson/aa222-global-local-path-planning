@@ -58,7 +58,7 @@ class Drone():
         
         # Deduct costs from budget
         step_cost = self.time_cost
-        if action in [1, 2, 3, 4]: # Movement actions
+        if action in [2, 3, 4, 5, 6, 7, 8, 9]: # Movement actions
             step_cost += self.movement_cost
         self.budget -= step_cost
 
@@ -67,16 +67,29 @@ class Drone():
         x = self.x
         y = self.y
         
-        if action == 1:  # Up
+        if action == 1: # Collect the science
+            if np.array_equal(self.position, self.env.science_pos):
+                self.env.science_collected = True
+        elif action == 2:  # Up
             y = min(self.env.grid_size - 1, self.y + 1)
-        elif action == 2:  # Down
+        elif action == 3:  # Down
             y = max(0, self.y - 1)
-        elif action == 3:  # Left
+        elif action == 4:  # Left
             x = max(0, self.x - 1)
-        elif action == 4:  # Right
+        elif action == 5:  # Right
             x = min(self.env.grid_size - 1, self.x + 1)
-        elif action == 5: # Collect the science
-            self.env.science_collected = True
+        elif action == 6: # Up-Right
+            x = min(self.env.grid_size - 1, self.x + 1)
+            y = min(self.env.grid_size - 1, self.y + 1)
+        elif action == 7: # Up-Left
+            x = max(0, self.x - 1)
+            y = min(self.env.grid_size - 1, self.y + 1)
+        elif action == 8: # Down-Right
+            x = min(self.env.grid_size - 1, self.x + 1)
+            y = max(0, self.y - 1)
+        elif action == 9: # Down-Left
+            x = max(0, self.x - 1)
+            y = max(0, self.y - 1)
 
         self.drifted = False
 
@@ -133,19 +146,6 @@ class Drone():
         
         if science_observed: 
             print(f"Drone {self.drone_id} found science objective at position {self.env.science_pos}!")
-            
-            if np.array_equal(self.position, self.env.science_pos):
-                self.action(5) # Collect the science
-
-            else: # Move towards the science
-                if self.x < self.env.science_pos[0]:
-                    self.action(4)
-                elif self.x > self.env.science_pos[0]:
-                    self.action(3)
-                elif self.y < self.env.science_pos[1]:
-                    self.action(1)
-                elif self.y > self.env.science_pos[1]:
-                    self.action(2)
 
         return science_observed
 
@@ -159,7 +159,7 @@ class Drone():
             return 0.0
             
         max_q = -float('inf')
-        moves = { 1: (0, 1), 2: (0, -1), 3: (-1, 0), 4: (1, 0)}
+        moves = { 2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}
         current_entropy = belief.get_entropy()
         
         for _, (dx, dy) in moves.items():
@@ -215,9 +215,9 @@ class Drone():
         
         current_entropy = self.belief_state.get_entropy()
         
-        # Actions: 0=Stay 1=Up, 2=Down, 3=Left, 4=Right
-        moves = { 1: (0, 1), 2: (0, -1), 3: (-1, 0), 4: (1, 0)}
-
+        # Actions: 0=Stay, 2=Up, 3=Down, 4=Left, 5=Right, 6=UpRight, 7=UpLeft, 8=DownRight, 9=DownLeft
+        moves = { 2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}
+        
         # --- Check the Q-value for performing a movement ---
         for action_idx, (dx, dy) in moves.items():
             nx = max(0, min(self.env.grid_size - 1, self.x + dx))

@@ -159,7 +159,8 @@ class SearchEnv(Env):
         self.status_texts = []
 
         # Display Drone Info (Entropy & Action)
-        action_map = {0: 'Stay', 1: 'Right', 2: 'Left', 3: 'Up', 4: 'Down', 6: 'Collect Science'}
+        action_map = {0: 'Stay', 1: 'Collect Science', 2: 'Up', 3: 'Down', 4: 'Left', 
+                      5: 'Right', 6: 'Up-Right', 7: 'Up-Left', 8: 'Down-Right', 9: 'Down-Left'}
         
         for i, drone in enumerate(drones):
             entropy = drone.belief_state.get_entropy()
