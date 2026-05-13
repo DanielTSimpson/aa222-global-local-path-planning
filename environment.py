@@ -100,7 +100,7 @@ class SearchEnv(Env):
         [self.spawn_obstacle(self.terrain["SMALL OBSTACLE"], small_mu, small_sigma) for _ in range(num_small)]
     
 
-    def render(self, drones):
+    def render(self, drones, path=None):
         grid = np.zeros((self.grid_size, self.grid_size))
         
         large_obs_val = self.terrain.get("LARGE OBSTACLE", self.terrain.get("LARGE OBSTACLE", 3))
@@ -191,6 +191,18 @@ class SearchEnv(Env):
         # arrow = patches.Arrow(self.grid_size - 2.5, 2.5, dx, dy, width=0.5, color='black', zorder=10)
         # self.ax.add_patch(arrow)
         # self.patches.append(arrow)
+
+        # Draw the planned path if provided
+        if path is not None:
+            for (r, c) in path:
+                # Draw small semi-transparent circles for the path
+                dot = patches.Circle(
+                    (c, r), 0.2, 
+                    color='red', alpha=0.3, zorder=5
+                )
+                assert self.ax is not None
+                self.ax.add_patch(dot)
+                self.patches.append(dot)
 
         for drone in drones:
             corner_x = drone.x - drone.window_size // 2 - 0.5

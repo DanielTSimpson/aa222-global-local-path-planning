@@ -174,7 +174,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
 
     for i in range(N):
         if render == 2 or save_gif:
-            env.render([drone])
+            env.render([drone], path=reconstructed_path)
             if render == 2:
                 plt.pause(render_pause)
         
@@ -192,7 +192,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
             if render == 1 or render == 2:
                 print(f"\tScience collected! Completed in {time_to_obj*dt} time units")
                 if render == 2:
-                    env.render([drone])
+                    env.render([drone], path=reconstructed_path)
                     plt.pause(5)
             break
         
