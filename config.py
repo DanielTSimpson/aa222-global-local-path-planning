@@ -14,8 +14,8 @@ WIND_DIRECTION = 2*np.pi*np.random.random() # Direction of the wind in radians (
 OBSTACLES_ENABLED = True # I figure it's nice to be able to toggle this when testing our path planning
  
 NUM_LARGE_OBSTACLES = GRID_SIZE // 3
-LARGE_OBSTACLE_SIZE_MU = 6 # Mean size of the larger obstacles -- I think that having the required size for visibility by the overhead agent be ~3 cells is a good place to start
-LARGE_OBSTACLE_SIZE_SIGMA = 1 # Standard deviation of the large obstacle size
+LARGE_OBSTACLE_SIZE_MU = 7 # Mean size of the larger obstacles -- I think that having the required size for visibility by the overhead agent be ~3 cells is a good place to start
+LARGE_OBSTACLE_SIZE_SIGMA = 3 # Standard deviation of the large obstacle size
 
 NUM_SMALL_OBSTACLES = GRID_SIZE // 1
 SMALL_OBSTACLE_SIZE_MU = 1.5 # Mean size of the smaller obstacles, only detectable by the drone

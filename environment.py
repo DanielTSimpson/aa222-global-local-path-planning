@@ -80,7 +80,7 @@ class SearchEnv(Env):
         return int(clipped[0]), int(clipped[1])
     
 
-    def spawn_obstacle(self, obs_type, mu, sigma):
+    def spawn_obstacle(self, obs_type, mu, sigma, type = None):
         w, h = self._sample_obstacle_size(mu, sigma)
         blocked_map = (self.the_grid != self.terrain["FREE"]).astype(int)
         footprint = np.ones((h, w), dtype=int)
@@ -88,7 +88,15 @@ class SearchEnv(Env):
         valid_y, valid_x = np.where(overlap_map == 0)
         if len(valid_y) == 0:
             return None
-        random_idx = np.random.randint(len(valid_y))
+        if type == None or type == "Random":
+            random_idx = np.random.randint(len(valid_y))
+
+        if type == "Gaussian":
+            """ I want to choose indexes near the middle to 
+             bias more obstacles in the agent's path, but also 
+             make sure there's a decent enough spread such that 
+             we dont get a massive "rock" in the middle"""
+            random_idx = round(np.random.normal(len(valid_x) // 2, 2*np.sqrt(len(valid_x))))
         r = valid_y[random_idx]
         c = valid_x[random_idx]
         self.the_grid[r : r+h, c : c+w] = obs_type
@@ -96,7 +104,7 @@ class SearchEnv(Env):
     
     
     def generate_obstacles(self, num_large = 5, num_small = 15, large_mu = 4, large_sigma = 1.0, small_mu = 1.5, small_sigma = 0.5):
-        [self.spawn_obstacle(self.terrain["LARGE OBSTACLE"], large_mu, large_sigma) for _ in range(num_large)]
+        [self.spawn_obstacle(self.terrain["LARGE OBSTACLE"], large_mu, large_sigma, type = "Gaussian") for _ in range(num_large)]
         [self.spawn_obstacle(self.terrain["SMALL OBSTACLE"], small_mu, small_sigma) for _ in range(num_small)]
     
 
@@ -134,7 +142,7 @@ class SearchEnv(Env):
             self.ax.grid(which='minor', color='gray', linestyle='-', linewidth=1)
             self.ax.set_xlabel('Y Position')
             self.ax.set_ylabel('X Position')
-            self.ax.set_title("Multi-Agent Science Objective Sear", fontsize=12, fontweight='bold')
+            self.ax.set_title("Multi-Agent Science Objective Search", fontsize=12, fontweight='bold')
 
             plt.ion()
             plt.show(block=False)
