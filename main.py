@@ -222,7 +222,6 @@ def optimize():
 
 
 if __name__ == '__main__':
-    # TODO: Implement A-star to generate a global path
     # TODO: Make the drone's observation window forward facing 
         # This implies TODO: Add orientation to the drone's state
     # TODO: Remove exploration POMDP and implement obstacle handling instead
