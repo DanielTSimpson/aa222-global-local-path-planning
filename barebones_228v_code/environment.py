@@ -157,7 +157,7 @@ class SearchEnv(Env):
             self.ax.grid(which='minor', color='gray', linestyle='-', linewidth=1)
             self.ax.set_xlabel('Y Position')
             self.ax.set_ylabel('X Position')
-            self.ax.set_title("Multi-Agent Science Objective Sear", fontsize=12, fontweight='bold')
+            self.ax.set_title("Multi-Agent Science Objective Search", fontsize=12, fontweight='bold')
 
             plt.ion()
             plt.show(block=False)
