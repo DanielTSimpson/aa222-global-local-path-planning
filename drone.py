@@ -168,13 +168,13 @@ class Drone:
         for cell in observations["visible_cells"]:
             self.visited_cells.add(cell)
 
-        for obstacle in observations["small_obstacles"]:
+        for obstacle in observations["detected_obstacles"]:
             self.known_small_obstacles.add(obstacle)
 
-        for science_cell in observations["science"]:
+        for science_cell in observations["detected_science"]:
             self.known_science.add(science_cell)
 
-        science_observed = len(observations["science"]) > 0
+        science_observed = len(observations["detected_science"]) > 0
 
         self.belief_state.update_from_observation(
             self.position,
