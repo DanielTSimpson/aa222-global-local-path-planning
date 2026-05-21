@@ -6,6 +6,7 @@ import numpy as np
 from copy import deepcopy
 from environment import SearchEnv
 from belief import Belief     
+from sensors import OnlineSensor
 import config as cfg
 
 class Drone():
@@ -14,7 +15,7 @@ class Drone():
     """
     def __init__(self, environment: SearchEnv):
         self.drone_id = 0
-        self.window_size = 0
+        self.window_size = cfg.OBSERVATION_WINDOW_SIZE
         self.env = environment
         # making sure our drone doesn't spawn inside of an obstacle
         while True:
@@ -40,7 +41,13 @@ class Drone():
         self.movement_cost = 0.0
         self.comm_cost = 0.0
         self.time_cost = 0.0
-        
+
+        # Sensor Params
+        self.sensor = OnlineSensor(view_depth = cfg.SENSOR_VIEW_DEPTH, view_angle = cfg.SENSOR_VIEW_ANGLE, false_negative_rate = cfg.SENSOR_FALSE_NEGATIVE_RATE, false_positive_rate = cfg.SENSOR_FALSE_POSITIVE_RATE)
+        self.heading = 0.0
+        self.known_small_obstacles = set()
+        self.known_science = set()
+
         self.science_found = self.observe()
         if not self.history:
             self.history.append(self.state)
@@ -78,12 +85,20 @@ class Drone():
         
         if action == 1:  # Up
             y = min(self.env.grid_size - 1, self.y + 1)
+            self.heading = np.pi/2
+
         elif action == 2:  # Down
             y = max(0, self.y - 1)
+            self.heading = -np.pi/2
+
         elif action == 3:  # Left
             x = max(0, self.x - 1)
+            self.heading = np.pi
+
         elif action == 4:  # Right
             x = min(self.env.grid_size - 1, self.x + 1)
+            self.heading = 0.0
+
         elif action == 5: # Communicate
             telemetry_packet = self.create_telemetry_packet()
             self.steps_since_last_comm = 0
@@ -132,39 +147,20 @@ class Drone():
 
 
     def observe(self):
-        """Update belief based on observation"""
-        x_check = (self.x - self.window_size // 2 <= self.env.science_pos[0] <= self.x + self.window_size // 2)
-        y_check = (self.y - self.window_size // 2 <= self.env.science_pos[1] <= self.y + self.window_size // 2)
-        science_observed = x_check and y_check
-        
-        self.belief_state.update_from_observation(self.position, self.window_size, science_observed)        
-        
-        # Update visited_cells to include all observed cells
-        half = self.window_size // 2
-        x_min, x_max = max(0, self.x - half), min(self.env.grid_size, self.x + half + 1)
-        y_min, y_max = max(0, self.y - half), min(self.env.grid_size, self.y + half + 1)
-        for r in range(x_min, x_max):
-            for c in range(y_min, y_max):
-                self.visited_cells.add((r, c))
-        
-        if science_observed: 
-            print(f"Drone {self.drone_id} found science objective at position {self.env.science_pos}!")
-            
-            if np.array_equal(self.position, self.env.science_pos):
-                self.action(6) # Collect the science
+        # update our belief based on online sensor observations
+        observations = self.sensor.observe(drone_pos = self.position, heading = self.heading, environment = self.env)
 
-            else: # Move towards the science
-                if self.x < self.env.science_pos[0]:
-                    self.action(4)
-                elif self.x > self.env.science_pos[0]:
-                    self.action(3)
-                elif self.y < self.env.science_pos[1]:
-                    self.action(1)
-                elif self.y > self.env.science_pos[1]:
-                    self.action(2)
+        for cell in observations["visible_cells"]:
+            self.visited_cells.add(cell)
+
+        for obstacle in observations["small_obstacles"]:
+            self.known_small_obstacles.add(obstacle)
+
+        science_observed = len(observations["science"]) > 0
+
+        self.belief_state.update_from_observation(self.position, self.window_size, science_observed)
 
         return science_observed
-
 
     def create_telemetry_packet(self):
         """Creates telemetry packet with belief state"""

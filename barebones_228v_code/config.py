@@ -39,6 +39,12 @@ NUM_DRONES = 1
 OBSERVATION_WINDOW_SIZE = 3
 LOOKAHEAD_DEPTH = 3
 
+# ===== Drone sensor parameters ===== 
+SENSOR_VIEW_DEPTH = 4
+SENSOR_VIEW_ANGLE = np.pi/2
+SENSOR_FALSE_NEGATIVE_RATE = 0.05
+SENSOR_FALSE_POSITIVE_RATE = 0.01
+
 # ===== Dec-POMDP parameters ===== 
 GAMMA = 0.95
 EXPLORATION_BONUS = 50.0  # Bonus reward for exploring new cells, promotes active exploration of new cells
