@@ -51,7 +51,9 @@ class SearchEnv(Env):
         self.small_science = {}
         self.collected_small_science = set()
         self.show_hidden_small_science = False
-
+        
+        # adding a pause button
+        self.paused = False
 
     def reset_obstacles(self):
         # clears existing obstacles from the environment, called before generating a new map
@@ -153,6 +155,10 @@ class SearchEnv(Env):
         self.show_hidden_science = not self.show_hidden_science
         self.show_hidden_small_science = not self.show_hidden_small_science
         print(f"Show hidden science: {self.show_hidden_science}")
+        
+    def toggle_pause(self, event):
+        self.paused = not self.paused
+        print(f"Paused: {self.paused}")
 
     def render(self, drones, path=None):
         grid = np.zeros((self.grid_size, self.grid_size))
@@ -222,11 +228,14 @@ class SearchEnv(Env):
             # adding our toggle buttons
             button_ax1 = self.fig.add_axes([0.15, 0.01, 0.30, 0.05])
             button_ax2 = self.fig.add_axes([0.55, 0.01, 0.30, 0.05])
+            button_ax3 = self.fig.add_axes([0.35, 0.07, 0.30, 0.05])
             button1 = Button(button_ax1, 'Toggle Small Obstacle Visibility')
             button2 = Button(button_ax2, 'Toggle Science Visibility')
+            button3 = Button(button_ax3, 'Pause/Resume')
             button1.on_clicked(self.toggle_small_obstacles)
             button2.on_clicked(self.toggle_science)
-            self.buttons = [button1, button2]
+            button3.on_clicked(self.toggle_pause)
+            self.buttons = [button1, button2, button3]
 
             plt.ion()
             plt.show(block=False)

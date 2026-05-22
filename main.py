@@ -101,6 +101,9 @@ def simulate_pomdp(x:list = [], trial_num = 0, render=0, save_gif=False):
             if render == 2:
                 plt.pause(render_pause)
         
+        while env.paused:
+            plt.pause(0.1)
+        
         # Check for budget failure (Mode 1)
         if drone.budget <= 0:
             failure_mode = 1
@@ -183,6 +186,9 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
             env.render([drone], path=reconstructed_path)
             if render == 2:
                 plt.pause(render_pause)
+        
+        while env.paused:
+            plt.pause(0.1)
         
         # Check for budget failure (Mode 1)
         if drone.budget <= 0:
