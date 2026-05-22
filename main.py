@@ -6,6 +6,7 @@ from belief import Belief
 from gps import GPS
 import matplotlib.pyplot as plt
 
+np.random.seed(cfg.SEED)
 
 def initialize_drone(env, window_size):
     """Initialize drones at random positions that don't see the science initially
@@ -102,6 +103,7 @@ def simulate_pomdp(x:list = [], trial_num = 0, render=0, save_gif=False):
                 plt.pause(render_pause)
         
         while env.paused:
+            env.render([drone])
             plt.pause(0.1)
         
         # Check for budget failure (Mode 1)
@@ -191,6 +193,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
                 plt.pause(render_pause)
         
         while env.paused:
+            env.render([drone], path=reconstructed_path)
             plt.pause(0.1)
         
         # Check for budget failure (Mode 1)

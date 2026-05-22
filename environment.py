@@ -149,16 +149,26 @@ class SearchEnv(Env):
         # helper function for toggling small obstacle visibility
         self.show_hidden_small_obstacles = not self.show_hidden_small_obstacles
         print(f"Show hidden small obstacles: {self.show_hidden_small_obstacles}")
+        self.request_redraw()
 
     def toggle_science(self, event):
         # helper function for toggling science visibility
         self.show_hidden_science = not self.show_hidden_science
         self.show_hidden_small_science = not self.show_hidden_small_science
         print(f"Show hidden science: {self.show_hidden_science}")
+        self.request_redraw()
         
     def toggle_pause(self, event):
         self.paused = not self.paused
         print(f"Paused: {self.paused}")
+        self.request_redraw()
+        
+    def request_redraw(self):
+        # if you have the run paused and try to toggle the environment stuff, it won't show until you Unpause
+        # so this is gonna fix that
+        if self.fig is not None:
+            self.fig.canvas.draw_idle()
+            self.fig.canvas.flush_events()
 
     def render(self, drones, path=None):
         grid = np.zeros((self.grid_size, self.grid_size))
