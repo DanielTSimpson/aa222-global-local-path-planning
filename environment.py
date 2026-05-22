@@ -151,6 +151,7 @@ class SearchEnv(Env):
     def toggle_science(self, event):
         # helper function for toggling science visibility
         self.show_hidden_science = not self.show_hidden_science
+        self.show_hidden_small_science = not self.show_hidden_small_science
         print(f"Show hidden science: {self.show_hidden_science}")
 
     def render(self, drones, path=None):
