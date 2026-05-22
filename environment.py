@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import matplotlib.patches as patches
+from matplotlib.widgets import Button
 from scipy.signal import convolve2d
 
 from gymnasium import Env
@@ -38,6 +39,11 @@ class SearchEnv(Env):
         self.status_texts = []
         self.frames = []
         self.record_frames = False
+        
+        # setting a toggleable option for showing the user small obstacles the drone hasn't observed yet
+        self.show_hidden_small_obstacles = False 
+        self.show_hidden_science = False
+        self.buttons = []
 
 
     def reset_obstacles(self):
@@ -107,6 +113,15 @@ class SearchEnv(Env):
         [self.spawn_obstacle(self.terrain["LARGE OBSTACLE"], large_mu, large_sigma, type = "Gaussian") for _ in range(num_large)]
         [self.spawn_obstacle(self.terrain["SMALL OBSTACLE"], small_mu, small_sigma) for _ in range(num_small)]
     
+    def toggle_small_obstacles(self, event):
+        # helper function for toggling small obstacle visibility
+        self.show_hidden_small_obstacles = not self.show_hidden_small_obstacles
+        print(f"Show hidden small obstacles: {self.show_hidden_small_obstacles}")
+
+    def toggle_science(self, event):
+        # helper function for toggling science visibility
+        self.show_hidden_science = not self.show_hidden_science
+        print(f"Show hidden science: {self.show_hidden_science}")
 
     def render(self, drones, path=None):
         grid = np.zeros((self.grid_size, self.grid_size))
@@ -120,11 +135,25 @@ class SearchEnv(Env):
                 if self.the_grid[r, c] != large_obs_val and self.the_grid[r, c] != small_obs_val: # only mark cells as explored if they're not an obstacle -- otherwise we're overwriting those grids visually
                     grid[r, c] = 1
                     
+        # highlighting currently visible cells to show what the drone is seeing
+        for drone in drones:
+            if hasattr(drone, "current_visible_cells"):
+                for (r, c) in drone.current_visible_cells:
+                    if not self.is_obstacle(r, c): # we want to make sure we don't overwrite obstacle colors with the visible cell color
+                        grid[r, c] = 6
+                    
+        # large obstacles should always be visible
         grid[self.the_grid == large_obs_val] = 7
-        grid[self.the_grid == small_obs_val] = 8
-
-
-        if not self.science_found:
+        
+        if self.show_hidden_small_obstacles:
+            grid[self.the_grid == small_obs_val] = 8
+        else:
+            for drone in drones:
+                for (r, c) in drone.known_small_obstacles:
+                    grid[r, c] = 8
+        
+        science_visible_to_drone = any(tuple(self.science_pos) in getattr(drone, "known_science", set()) for drone in drones)
+        if self.show_hidden_science or science_visible_to_drone:
             grid[tuple(self.science_pos)] = 2
 
         for idx, drone in enumerate(drones):
@@ -143,6 +172,15 @@ class SearchEnv(Env):
             self.ax.set_xlabel('Y Position')
             self.ax.set_ylabel('X Position')
             self.ax.set_title("Multi-Agent Science Objective Search", fontsize=12, fontweight='bold')
+            
+            # adding our toggle buttons
+            button_ax1 = self.fig.add_axes([0.15, 0.01, 0.30, 0.05])
+            button_ax2 = self.fig.add_axes([0.55, 0.01, 0.30, 0.05])
+            button1 = Button(button_ax1, 'Toggle Small Obstacle Visibility')
+            button2 = Button(button_ax2, 'Toggle Science Visibility')
+            button1.on_clicked(self.toggle_small_obstacles)
+            button2.on_clicked(self.toggle_science)
+            self.buttons = [button1, button2]
 
             plt.ion()
             plt.show(block=False)

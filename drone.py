@@ -51,6 +51,8 @@ class Drone:
         self.heading = 0.0
         self.known_small_obstacles = set()
         self.known_science = set()
+        
+        self.current_visible_cells = set()
 
         self.science_found = self.observe()
         if not self.history:
@@ -164,6 +166,8 @@ class Drone:
             heading=self.heading,
             environment=self.env,
         )
+        
+        self.current_visible_cells = set(observations["visible_cells"])
 
         for cell in observations["visible_cells"]:
             self.visited_cells.add(cell)
