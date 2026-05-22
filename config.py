@@ -5,6 +5,7 @@ Centralized place for all simulation parameters
 """
 
 #  ===== Environment parameters ===== 
+SEED = 42 # random seed for reproducibility
 GRID_SIZE = 50  # Size of the NxN grid
 ENABLE_WIND = False # Wind Toggle
 WIND_SPEED = np.random.normal(0.05, 0.05**2) # Probability of agents drifting after an action
@@ -55,6 +56,13 @@ TIME_STEP = 0.05
 MAX_SIMULATION_TIME = 250.0
 MAX_BUDGET_PER_DRONE = 5000 * NUM_DRONES
 RENDER_PAUSE = 0.05
+
+# ===== Local planner parameters =====
+LOCAL_PLANNER_TYPE = "random_shooting" # options are random_shooting, simulated_annealing, greedy, and genetic_algorithm
+
+# TODO LATER: rather than have to tune each weight individually, it could be good to just have different run types
+# for instance, we could have a "science-focused" run where science is weighted above a nominal value, or a "battery-focused" run and so on
+LOCAL_PLANNER_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0}
 
 # Initial, nominal parameters
 # Order: [W_dist, mu_dist, var_dist, mu_wind, var_wind, W_angle, var_wind_angle_change]
