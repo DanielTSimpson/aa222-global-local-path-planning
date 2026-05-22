@@ -51,7 +51,7 @@ class OnlineSensor:
         visible_cells = self.get_visible_cells(drone_pos, heading, grid_size = environment.grid_size)
 
         # storing our sensor's outputs
-        observations = {"visible_cells": visible_cells, "detected_obstacles": [], "detected_science": [], "missed_cells": []}
+        observations = {"visible_cells": visible_cells, "detected_obstacles": [], "detected_science": [], "detected_small_science": [], "missed_cells": []}
 
         for cell in visible_cells:
             r, c = cell # defining the row and column number of the cell we're analyzing
@@ -81,11 +81,20 @@ class OnlineSensor:
             if np.array_equal(np.array([r, c]), environment.science_pos):
                 # we're also going to include a false_negative option here
                 if np.random.random() > self.false_negative_rate:
-                    observations["science"].append(cell)
+                    observations["detected_science"].append(cell)
                 
                 # similarly, we include any missed cells
                 else:
                     observations["missed_cells"].append(cell)
+                    
+            # okay, hopefully last thing here, we're checking for small local science objectives
+            if cfg.SMALL_SCIENCE_ENABLED:
+                if cell in environment.small_science:
+                    if cell not in environment.collected_small_science:
+                        if np.random.random() > self.false_negative_rate:
+                            observations["detected_small_science"].append(cell)
+                        else:
+                            observations["missed_cells"].append(cell)
         return observations
     
     @staticmethod

@@ -52,6 +52,9 @@ class Drone:
         self.known_small_obstacles = set()
         self.known_science = set()
         
+        self.known_small_science = set()
+        self.small_science_collected_value = 0
+        
         self.current_visible_cells = set()
 
         self.science_found = self.observe()
@@ -147,6 +150,17 @@ class Drone:
             candidate = prev_position
 
         self.position = candidate
+        
+        if cfg.SMALL_SCIENCE_ENABLED:
+            current_cell = tuple(self.position)
+            if current_cell in self.env.small_science:
+                if current_cell not in self.env.collected_small_science:
+                    value = self.env.small_science[current_cell]
+                    self.small_science_collected_value += value
+                    self.env.collected_small_science.add(current_cell)
+                    self.known_small_science.discard(current_cell)
+
+                    print(f"Drone {self.drone_id} collected small science at {current_cell} worth {value}")
 
         if np.array_equal(self.position, prev_position):
             self.stuck_count += 1
@@ -177,6 +191,9 @@ class Drone:
 
         for science_cell in observations["detected_science"]:
             self.known_science.add(science_cell)
+            
+        for small_science_cell in observations["detected_small_science"]:
+            self.known_small_science.add(small_science_cell)
 
         science_observed = len(observations["detected_science"]) > 0
 

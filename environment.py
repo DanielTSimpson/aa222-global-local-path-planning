@@ -12,6 +12,8 @@ from scipy.signal import convolve2d
 from gymnasium import Env
 import imageio
 
+import config as cfg
+
 class SearchEnv(Env):
     """Multi-agent search environment with Dec-POMDP framework"""
     def __init__(self, grid_size=20):
@@ -44,6 +46,11 @@ class SearchEnv(Env):
         self.show_hidden_small_obstacles = False 
         self.show_hidden_science = False
         self.buttons = []
+        
+        # adding in the small scienc objectives scattered throughout the map
+        self.small_science = {}
+        self.collected_small_science = set()
+        self.show_hidden_small_science = False
 
 
     def reset_obstacles(self):
@@ -84,6 +91,29 @@ class SearchEnv(Env):
         height = int(round(np.random.normal(mu, sigma)))
         clipped = np.clip([width, height], min_size, max_size)
         return int(clipped[0]), int(clipped[1])
+    
+    def generate_small_science(self, num_small_science = 10, min_value = 1, max_value =5):
+        # populates the grid world with small science objectives, forcing the drone to explore more if it comes across one
+        placed = 0
+        attempts = 0
+        max_attempts = 1000 # I'm hard coding this because there's no way we'll hit 1000
+        
+        while placed < num_small_science and attempts < max_attempts:
+            attempts += 1
+            
+            r = np.random.randint(0, self.grid_size)
+            c = np.random.randint(0, self.grid_size)
+            
+            cell = (r, c)
+            
+            # these are basically the 3 conditions which would stop us from putting a science objective in a cell
+            if not self.is_free(r, c) or cell == tuple(self.science_pos) or cell in self.small_science:
+                continue
+            
+            value = np.random.randint(min_value, max_value + 1)
+            self.small_science[cell] = value
+            
+            placed += 1
     
 
     def spawn_obstacle(self, obs_type, mu, sigma, type = None):
@@ -155,12 +185,27 @@ class SearchEnv(Env):
         science_visible_to_drone = any(tuple(self.science_pos) in getattr(drone, "known_science", set()) for drone in drones)
         if self.show_hidden_science or science_visible_to_drone:
             grid[tuple(self.science_pos)] = 2
+            
+        if cfg.SMALL_SCIENCE_ENABLED:
+            
+            # if we have the toggle on, then show all small science
+            if self.show_hidden_small_science:
+                for (r, c), value in self.small_science.items():
+                    if (r, c) not in self.collected_small_science:
+                        grid[r, c] = 9
+                        
+            # otherwise, only show detected small science
+            else:
+                for drone in drones:
+                    for (r, c) in drone.known_small_science:
+                        if (r, c) not in self.collected_small_science:
+                            grid[r, c] = 9
 
         for idx, drone in enumerate(drones):
             grid[tuple(drone.position)] = idx + 3
 
-        cmap = colors.ListedColormap(['#ffcccc', 'white', '#2ecc71', 'blue', 'green', 'orange', 'purple', 'grey', 'darkgreen'])
-        bounds = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5]
+        cmap = colors.ListedColormap(['#ffcccc', 'white', '#2ecc71', 'blue', 'green', 'orange', 'purple', 'grey', 'darkgreen', "yellow"])
+        bounds = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
 
         if self.fig is None:

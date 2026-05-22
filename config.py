@@ -24,6 +24,12 @@ SMALL_OBSTACLE_SIZE_SIGMA = 0.5 # Standard deviation of the small obstacle size
 OBSTACLE_BUFFER_AROUND_OBJECTIVES = 2 # Number of empty cells around the objective
 OBSTACLE_BUFFER_AROUND_START = 2 # Number of empty cells around the drone start location
 
+# ===== Small Science parameters ===== 
+SMALL_SCIENCE_ENABLED = True # toggle for whether we want to include small science objectives throughout the grid world or not
+NUM_SMALL_SCIENCE = GRID_SIZE // 4 # how many small science objectives are scattered throughout the grid world
+SMALL_SCIENCE_MIN_VALUE = 1 # the minimum value of a small science objective
+SMALL_SCIENCE_MAX_VALUE = 5 # the maximum value of a small science objective
+
 # ===== Drone parameters ===== 
 NUM_DRONES = 1
 OBSERVATION_WINDOW_SIZE = 3
