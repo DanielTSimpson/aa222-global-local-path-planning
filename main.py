@@ -59,7 +59,8 @@ def simulate_pomdp(x:list = [], trial_num = 0, render=0, save_gif=False):
 
     env.generate_obstacles(num_large = cfg.NUM_LARGE_OBSTACLES, num_small = cfg.NUM_SMALL_OBSTACLES, large_mu = cfg.LARGE_OBSTACLE_SIZE_MU, large_sigma = cfg.LARGE_OBSTACLE_SIZE_SIGMA, small_mu = cfg.SMALL_OBSTACLE_SIZE_MU, small_sigma = cfg.SMALL_OBSTACLE_SIZE_SIGMA)
     
-    env.generate_small_scince(num_science = cfg.NUM_SMALL_SCIENCE, min_value = cfg.SMALL_SCIENCE_MIN_VALUE, max_value = cfg.SMALL_SCIENCE_MAX_VALUE)
+    if cfg.SMALL_SCIENCE_ENABLED:
+        env.generate_small_science(num_science = cfg.NUM_SMALL_SCIENCE, min_value = cfg.SMALL_SCIENCE_MIN_VALUE, max_value = cfg.SMALL_SCIENCE_MAX_VALUE)
     
     if cfg.ENABLE_WIND:
         env.wind_speed = cfg.WIND_SPEED

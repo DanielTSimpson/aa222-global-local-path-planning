@@ -8,6 +8,7 @@ from copy import deepcopy
 from environment import SearchEnv
 from belief import Belief
 from sensors import OnlineSensor
+from local_planner import *
 import config as cfg
 
 
@@ -21,7 +22,7 @@ class Drone:
         self.window_size = cfg.OBSERVATION_WINDOW_SIZE
         self.env = environment
 
-        self.position = np.array([environment.grid_size, environment.grid_size])
+        self.position = np.array([environment.grid_size - 2, environment.grid_size - 2])
         self.budget = cfg.MAX_BUDGET_PER_DRONE
         self.belief_state = Belief(self.env.grid_size)
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
@@ -60,6 +61,8 @@ class Drone:
         self.science_found = self.observe()
         if not self.history:
             self.history.append(self.state)
+            
+        self.local_optimizer = SimulatedAnnealingOptimizer(horizon = 5, iterations = 100, initial_temp = 10.0, cooling = 0.95, weights = cfg.LOCAL_PLANNER_WEIGHTS)
 
     @property
     def x(self):
@@ -313,6 +316,10 @@ class Drone:
         Lookahead POMDP planning.
         Returns the action index with the highest Q-value.
         """
+        
+        # working in our local optimizer
+        if len(self.known_small_obstacles) > 0 or len(self.known_small_science) > 0:
+            return self.local_optimizer.choose_action(self, self.env)
 
         # If science has been seen, move directly toward it.
         if len(self.known_science) > 0:

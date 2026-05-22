@@ -58,7 +58,7 @@ MAX_BUDGET_PER_DRONE = 5000 * NUM_DRONES
 RENDER_PAUSE = 0.05
 
 # ===== Local planner parameters =====
-LOCAL_PLANNER_TYPE = "random_shooting" # options are random_shooting, simulated_annealing, greedy, and genetic_algorithm
+LOCAL_PLANNER_TYPE = "simulated_annealing" # options are simulated_annealing, cross_entropy, and genetic_algorithm
 
 # TODO LATER: rather than have to tune each weight individually, it could be good to just have different run types
 # for instance, we could have a "science-focused" run where science is weighted above a nominal value, or a "battery-focused" run and so on
