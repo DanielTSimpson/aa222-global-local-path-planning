@@ -172,6 +172,9 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
     gps = GPS(env, drone)
     reconstructed_path, drone_instructions = gps.a_star()
     
+    drone.global_path = reconstructed_path
+    drone.global_path_index = 0
+    
     if drone_instructions is None:
         if render: print("\tFAILURE: GPS A* failed to find a path.")
         return
@@ -208,7 +211,16 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
                     plt.pause(5)
             break
         
-        drone.action(drone_instructions[i]) if i < len(drone_instructions) else drone.action(1)
+        # here, the global action is computed via A*
+        global_action = drone_instructions[i] if i < len(drone_instructions) else drone.action(1)
+        
+        # then, we see if this leads to one of the local planning optimizers needing to kick in (via an obstacle, science, etc.)
+        if drone.local_optimizer_needed(global_action):
+            action = drone.local_optimizer.choose_action(drone, env)
+        else:
+            action = global_action
+        
+        drone.action(action)
         
         # Check for stuck failure (Mode 3)
         if drone.stuck_count >= 20:

@@ -62,7 +62,7 @@ LOCAL_PLANNER_TYPE = "simulated_annealing" # options are simulated_annealing, cr
 
 # TODO LATER: rather than have to tune each weight individually, it could be good to just have different run types
 # for instance, we could have a "science-focused" run where science is weighted above a nominal value, or a "battery-focused" run and so on
-LOCAL_PLANNER_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0}
+LOCAL_PLANNER_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0}
 
 # Initial, nominal parameters
 # Order: [W_dist, mu_dist, var_dist, mu_wind, var_wind, W_angle, var_wind_angle_change]

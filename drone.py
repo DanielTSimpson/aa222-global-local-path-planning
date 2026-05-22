@@ -430,3 +430,24 @@ class Drone:
                 best_actions.append(action_idx)
 
         return int(np.random.choice(best_actions))
+    
+    def local_optimizer_needed(self, next_global_action = None):
+        # checks to see if something is in the global path or if there's something worth deviating for, and then returns if a local optimizer is neede
+        
+        # first, we see if there's a small science objective that's been detected
+        if cfg.SMALL_SCIENCE_ENABLED and len(self.known_small_science) > 0:
+            return True
+        
+        # then we check to see if the drone is repeatedly failing to move
+        if self.stuck_count > 0:
+            return True
+        
+        # lastly, we check if the next global path step points into a known small obstacle
+        if next_global_action is not None:
+            dx, dy = {2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}[next_global_action]
+            next_cell = (self.x + dx, self.y + dy)
+            
+            if next_cell in self.known_small_obstacles:
+                return True
+            
+        return False

@@ -43,8 +43,16 @@ def cost_path(path, drone, env, weights):
     
     obstacle_penalty = sum(1 for cell in path if cell in getattr(drone, "known_small_obstacles", set()))
     
+    # in order to get our drone to eventually return to the nominal path, we include a penalty for straying too far from the main path
+    path_deviation_cost = 0.0
+    if hasattr(drone, "global_path"):
+        for cell in path:
+            distances = [abs(cell[0] - p[0]) + abs(cell[1] - p[1]) for p in drone.global_path]
+            path_deviation_cost += min(distances) # we take the minimum distance from the cell to any point in the global path as our deviation cost
+    
     # now we incorporate the weights we have set for this run
-    total_score = - weights["science"] * science_reward - weights["explore"] * exploration_reward + weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty
+    # the first 3 terms are things we don't want, so they're additive. the last 2 terms are things we do want, so they're subtractive
+    total_score = (weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty + weights["path"] * path_deviation_cost) - (weights["science"] * science_reward + weights["explore"] * exploration_reward)
     return total_score
 
 # now we add in our different optimization algorithms
