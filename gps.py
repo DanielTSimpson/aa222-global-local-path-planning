@@ -5,7 +5,7 @@ Handles scanning for large obstacles
 from drone import Drone
 from environment import SearchEnv
 import numpy as np
-
+import config as cfg
 
 class GPS():
     def __init__(self, environment: SearchEnv, drone: Drone):
@@ -95,7 +95,8 @@ class GPS():
                     f_score[neighbor] = tentative_g + h_score[neighbor]
         
         if (reconstructed_path == []): 
-            print("ERR: NO PATH FOUND THROUGH A*")
+            if cfg.VERBOSE_LOGGING:
+                print("ERR: NO PATH FOUND THROUGH A*")
             return None, None
         drone_instructions = self._get_instructions(reconstructed_path)
         return reconstructed_path, drone_instructions

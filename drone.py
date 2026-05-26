@@ -140,7 +140,8 @@ class Drone:
                     self.env.collected_small_science.add(current_cell)
                     self.known_small_science.discard(current_cell)
 
-                    print(f"Drone collected small science at {current_cell} worth {value}")
+                    if cfg.VERBOSE_LOGGING:
+                        print(f"Drone collected small science at {current_cell} worth {value}")
 
         if np.array_equal(self.position, prev_position):
             self.stuck_count += 1
@@ -177,7 +178,7 @@ class Drone:
 
         science_observed = len(observations["detected_science"]) > 0
 
-        if science_observed:
+        if science_observed and cfg.VERBOSE_LOGGING:
             print("Drone found science objective!")
 
         return science_observed
@@ -195,7 +196,13 @@ class Drone:
         
         # lastly, we check if the next global path step points into a known small obstacle
         if next_global_action is not None:
-            dx, dy = {2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}[next_global_action]
+            moves = {2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}
+            
+            if next_global_action not in moves:
+                return False
+            
+            dx, dy = moves[next_global_action]
+            
             next_cell = (self.x + dx, self.y + dy)
             
             if next_cell in self.known_small_obstacles:

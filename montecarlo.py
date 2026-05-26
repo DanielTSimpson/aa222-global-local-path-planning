@@ -3,6 +3,7 @@ import config as cfg
 from main import simulate_astar
 import time
 import csv
+from tqdm import tqdm
 
 # the purpose of this is to implement a Monte Carlo optimization scheme to find the optimal set of weights for the simulated_annealing local planner
 # the plan is to extend this to other local planners once those are up
@@ -17,7 +18,7 @@ def evaluate_weights(weights, num_trials = 50, candidate_id = 0, csv_path = "mon
 
     cfg.LOCAL_PLANNER_WEIGHTS = weights
 
-    for seed in range(num_trials):
+    for seed in tqdm(range(num_trials), desc=f"Trials for candidate {candidate_id}", leave=False):
         np.random.seed(seed)
 
         start = time.perf_counter()
@@ -92,7 +93,7 @@ def monte_carlo_weight_search(num_candidates = 100, num_trials = 50):
     best_objective = float("inf")
     best_metrics = None
 
-    for i in range(num_candidates):
+    for i in tqdm(range(num_candidates), desc="Weight Candidates"):
         # actually computing the results from each candidate
         weights = sample_weights()
         objective, metrics = evaluate_weights(weights, num_trials = num_trials, candidate_id = i)
@@ -118,4 +119,4 @@ def monte_carlo_weight_search(num_candidates = 100, num_trials = 50):
     return best_weights, best_objective, best_metrics
 
 if __name__ == "__main__":
-    monte_carlo_weight_search(num_candidates = 100, num_trials = 50)
+    monte_carlo_weight_search(num_candidates = 30, num_trials = 30)

@@ -53,7 +53,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
     drone.global_path = reconstructed_path
     drone.global_path_index = 0
     
-    if drone_instructions is None:
+    if drone_instructions is None and cfg.VERBOSE_LOGGING:
         if render: print("\tFAILURE: GPS A* failed to find a path.")
         return
 
@@ -73,7 +73,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
         # Check for budget failure (Mode 1)
         if drone.budget <= 0:
             failure_mode = 1
-            if render == 1 or render == 2: print("\tFAILURE: Max budget exceeded")
+            if render == 1 or render == 2 and cfg.VERBOSE_LOGGING: print("\tFAILURE: Max budget exceeded")
             time_to_obj = i
             break
         
@@ -82,7 +82,8 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
             failure_mode = 0
             time_to_obj = i
             if render == 1 or render == 2:
-                print(f"\tScience collected! Completed in {time_to_obj*dt} time units")
+                if cfg.VERBOSE_LOGGING:
+                    print(f"\tScience collected! Completed in {time_to_obj*dt} time units")
                 if render == 2:
                     env.render(drone, path=reconstructed_path)
                     plt.pause(5)
@@ -107,7 +108,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
         if drone.stuck_count >= 20:
             failure_mode = 3
             time_to_obj = i
-            if render == 1 or render == 2:
+            if render == 1 or render == 2 and cfg.VERBOSE_LOGGING:
                 print("\tFAILURE: Drones got Stuck")
             break
 
@@ -116,7 +117,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
     total_time = time_to_obj * dt
     small_science_value = drone.small_science_collected_value
 
-    if failure_mode == 2 and (render == 1 or render == 2):
+    if failure_mode == 2 and (render == 1 or render == 2) and cfg.VERBOSE_LOGGING:
         print("\tFAILURE: Exceeded max sim time")
     
     if save_gif:
