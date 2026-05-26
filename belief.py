@@ -50,8 +50,12 @@ class Belief:
             mask[x_min:x_max, y_min:y_max] = 1.0
             self.belief_grid *= mask
         else:
-            # If no science, probability is 0.0 inside the window
-            self.belief_grid[x_min:x_max, y_min:y_max] = 0.0
+            # changed the update to be a gradual decrease in probability, because there's a likelihood that the science is present but the drone didn't pick it up
+            if cfg.SENSOR_FALSE_NEGATIVE_RATE > 0:
+                reduction_factor = cfg.SENSOR_FALSE_NEGATIVE_RATE
+                self.belief_grid[x_min:x_max, y_min:y_max] *= reduction_factor
+            else:
+                self.belief_grid[x_min:x_max, y_min:y_max] = 0.0
 
         # Normalize to ensure sum is 1.0
         total = np.sum(self.belief_grid)
