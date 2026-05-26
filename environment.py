@@ -142,6 +142,9 @@ class SearchEnv(Env):
     def toggle_small_obstacles(self, event):
         # helper function for toggling small obstacle visibility
         self.show_hidden_small_obstacles = not self.show_hidden_small_obstacles
+        if self.buttons:
+            self.buttons[0].color = "#cf7f7f" if self.show_hidden_small_obstacles else "#f8a3a3"
+            self.buttons[0].hovercolor = self.buttons[0].color
         print(f"Show hidden small obstacles: {self.show_hidden_small_obstacles}")
         self.request_redraw()
 
@@ -149,11 +152,17 @@ class SearchEnv(Env):
         # helper function for toggling science visibility
         self.show_hidden_science = not self.show_hidden_science
         self.show_hidden_small_science = not self.show_hidden_small_science
+        if self.buttons:
+            self.buttons[1].color = "#cf7f7f" if self.show_hidden_science else "#f8a3a3"
+            self.buttons[1].hovercolor = self.buttons[1].color
         print(f"Show hidden science: {self.show_hidden_science}")
         self.request_redraw()
         
     def toggle_pause(self, event):
         self.paused = not self.paused
+        if self.buttons:
+            self.buttons[2].color = "#cf7f7f" if self.paused else "#f8a3a3"
+            self.buttons[2].hovercolor = self.buttons[2].color
         print(f"Paused: {self.paused}")
         self.request_redraw()
         
@@ -215,7 +224,9 @@ class SearchEnv(Env):
         norm = colors.BoundaryNorm(bounds, cmap.N)
         if self.fig is None:
             ## Format the plot itself
-            self.fig, self.ax = plt.subplots(figsize=(6, 7))
+            self.fig, self.ax = plt.subplots(figsize=(5.5, 6.0))
+            self.fig.subplots_adjust(top=0.95, bottom=0.15)
+            self.ax.set_anchor('N')
             self.im = self.ax.imshow(grid, cmap=cmap, norm=norm)
             self.ax.set_xticks(np.arange(-.5, self.grid_size, 1), minor=True)
             self.ax.set_yticks(np.arange(-.5, self.grid_size, 1), minor=True)
@@ -224,16 +235,19 @@ class SearchEnv(Env):
             self.ax.set_ylabel('X Position')
             self.ax.set_title("Multi-Agent Science Objective Search", fontsize=12, fontweight='bold')
             ## Format Toggle Buttons
-            button_ax1 = self.fig.add_axes([0.10, 0.01, 0.40, 0.05])
-            button_ax2 = self.fig.add_axes([0.55, 0.01, 0.30, 0.05])
-            button_ax3 = self.fig.add_axes([0.35, 0.07, 0.30, 0.05])
-            button1 = Button(button_ax1, 'Toggle Small Obstacle Visibility')
-            button2 = Button(button_ax2, 'Toggle Science Visibility')
-            button3 = Button(button_ax3, 'Pause/Resume')
+            button_ax1 = self.fig.add_axes([0.07, 0.04, 0.42, 0.05])
+            button_ax2 = self.fig.add_axes([0.55, 0.04, 0.35, 0.05])
+            button_ax3 = self.fig.add_axes([0.35, 0.10, 0.30, 0.05])
+            button1 = Button(button_ax1, 'Toggle Small Obstacle Visibility', color="#f8a3a3", hovercolor="#f8a3a3")
+            button2 = Button(button_ax2, 'Toggle Science Visibility', color="#f8a3a3", hovercolor="#f8a3a3")
+            button3 = Button(button_ax3, 'Pause/Resume', color="#f8a3a3", hovercolor="#f8a3a3")
+
             button1.on_clicked(self.toggle_small_obstacles)
             button2.on_clicked(self.toggle_science)
             button3.on_clicked(self.toggle_pause)
+
             self.buttons = [button1, button2, button3]
+
 
             plt.ion()
             plt.show(block=False)

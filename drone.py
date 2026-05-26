@@ -17,7 +17,6 @@ class Drone:
     """
 
     def __init__(self, environment: SearchEnv):
-        self.window_size = cfg.OBSERVATION_WINDOW_SIZE
         self.env = environment
 
         self.position = np.array([environment.grid_size - 2, environment.grid_size - 2])

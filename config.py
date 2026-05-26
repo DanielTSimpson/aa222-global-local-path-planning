@@ -32,7 +32,6 @@ SMALL_SCIENCE_MIN_VALUE = 1 # the minimum value of a small science objective
 SMALL_SCIENCE_MAX_VALUE = 5 # the maximum value of a small science objective
 
 # ===== Drone parameters ===== 
-OBSERVATION_WINDOW_SIZE = 3
 LOOKAHEAD_DEPTH = 3
 
 # ===== Drone sensor parameters ===== 

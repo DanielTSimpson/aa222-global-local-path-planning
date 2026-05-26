@@ -7,32 +7,26 @@ import matplotlib.pyplot as plt
 
 np.random.seed(cfg.SEED)
 
-def initialize_drone(env, window_size):
+def initialize_drone(env):
     """Initialize drones at random positions that don't see the science initially
     
     Args:
         env: SearchEnv object
-        window_size: the drone's observation window size
         
     Returns:
         Drone: finalized Drone object
     """
     drone = Drone(env)
-
-    drone.window_size = window_size
     drone.gamma = cfg.GAMMA
     drone.exploration_bonus = cfg.EXPLORATION_BONUS 
     drone.movement_cost = cfg.MOVEMENT_COST
     drone.time_cost = cfg.TIME_COST    
-
     drone.position = np.array([env.grid_size - 2, env.grid_size - 2])
     drone.visited_cells = {(drone.position[0], drone.position[1])}
     drone.science_found = drone.observe()
     drone.history = [drone.state]
 
     return drone
-
-
 
 def simulate_astar(trial_num = 0, render=0, save_gif=False):
     # Initialize simulation parameters
@@ -55,8 +49,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
         env.record_frames = True
 
     ### Initialize the drone
-    drone_window_size = cfg.OBSERVATION_WINDOW_SIZE
-    drone = initialize_drone(env, drone_window_size)
+    drone = initialize_drone(env)
 
     ### Initialize the GPS
     gps = GPS(env, drone)
