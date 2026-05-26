@@ -55,6 +55,7 @@ class SearchEnv(Env):
         # adding a pause button
         self.paused = False
 
+
     def reset_obstacles(self):
         # clears existing obstacles from the environment, called before generating a new map
         self.the_grid = np.zeros((self.grid_size, self.grid_size), dtype = bool)
@@ -94,6 +95,7 @@ class SearchEnv(Env):
         clipped = np.clip([width, height], min_size, max_size)
         return int(clipped[0]), int(clipped[1])
     
+
     def generate_small_science(self, num_small_science = 10, min_value = 1, max_value =5):
         # populates the grid world with small science objectives, forcing the drone to explore more if it comes across one
         placed = 0
@@ -171,61 +173,58 @@ class SearchEnv(Env):
             self.fig.canvas.flush_events()
 
     def render(self, drones, path=None):
-        grid = np.zeros((self.grid_size, self.grid_size))
+        grid = np.zeros((self.grid_size, self.grid_size))        
+        large_obs_val = self.terrain.get("LARGE OBSTACLE", 3) #Get the value for large obstacles
+        small_obs_val = self.terrain.get("SMALL OBSTACLE", 4) #Get the value for small obstacles
         
-        large_obs_val = self.terrain.get("LARGE OBSTACLE", self.terrain.get("LARGE OBSTACLE", 3))
-        small_obs_val = self.terrain.get("SMALL OBSTACLE", self.terrain.get("SMALL OBSTACLE", 4))
 
-        # Mark explored cells (visited or observed)
-        for drone in drones:
-            for (r, c) in drone.visited_cells:
-                if self.the_grid[r, c] != large_obs_val and self.the_grid[r, c] != small_obs_val: # only mark cells as explored if they're not an obstacle -- otherwise we're overwriting those grids visually
-                    grid[r, c] = 1
-                    
-        # highlighting currently visible cells to show what the drone is seeing
-        for drone in drones:
-            if hasattr(drone, "current_visible_cells"):
-                for (r, c) in drone.current_visible_cells:
-                    if not self.is_obstacle(r, c): # we want to make sure we don't overwrite obstacle colors with the visible cell color
-                        grid[r, c] = 6
-                    
-        # large obstacles should always be visible
+        # ==== LABELING OBJECTS IN THE GRID ===
+        ## Label large obstacles
         grid[self.the_grid == large_obs_val] = 7
-        
+        ## Label small obstacles
         if self.show_hidden_small_obstacles:
             grid[self.the_grid == small_obs_val] = 8
         else:
             for drone in drones:
                 for (r, c) in drone.known_small_obstacles:
                     grid[r, c] = 8
-        
+        ## Label large science
         science_visible_to_drone = any(tuple(self.science_pos) in getattr(drone, "known_science", set()) for drone in drones)
         if self.show_hidden_science or science_visible_to_drone:
             grid[tuple(self.science_pos)] = 2
-            
+        ## Label small science
         if cfg.SMALL_SCIENCE_ENABLED:
-            
-            # if we have the toggle on, then show all small science
             if self.show_hidden_small_science:
                 for (r, c), value in self.small_science.items():
                     if (r, c) not in self.collected_small_science:
                         grid[r, c] = 9
-                        
-            # otherwise, only show detected small science
             else:
                 for drone in drones:
                     for (r, c) in drone.known_small_science:
                         if (r, c) not in self.collected_small_science:
                             grid[r, c] = 9
-
+        ## Label explored cells
+        for drone in drones:
+            for (r, c) in drone.visited_cells:
+                if self.the_grid[r, c] != large_obs_val and self.the_grid[r, c] != small_obs_val: # only mark cells as explored if they're not an obstacle -- otherwise we're overwriting those grids visually
+                    grid[r, c] = 1   
+        ## Label currently cells visible to the agent
+        for drone in drones:
+            if hasattr(drone, "current_visible_cells"):
+                for (r, c) in drone.current_visible_cells:
+                    if not self.is_obstacle(r, c): # we want to make sure we don't overwrite obstacle colors with the visible cell color
+                        grid[r, c] = 6
+        ## Label the agent itself            
         for idx, drone in enumerate(drones):
             grid[tuple(drone.position)] = idx + 3
 
+
+        # ===== FORMATTING THE PLOT =====
         cmap = colors.ListedColormap(['#ffcccc', 'white', '#2ecc71', 'blue', 'green', 'orange', 'purple', 'grey', 'darkgreen', "yellow"])
         bounds = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]
         norm = colors.BoundaryNorm(bounds, cmap.N)
-
         if self.fig is None:
+            ## Format the plot itself
             self.fig, self.ax = plt.subplots(figsize=(6, 7))
             self.im = self.ax.imshow(grid, cmap=cmap, norm=norm)
             self.ax.set_xticks(np.arange(-.5, self.grid_size, 1), minor=True)
@@ -234,9 +233,8 @@ class SearchEnv(Env):
             self.ax.set_xlabel('Y Position')
             self.ax.set_ylabel('X Position')
             self.ax.set_title("Multi-Agent Science Objective Search", fontsize=12, fontweight='bold')
-            
-            # adding our toggle buttons
-            button_ax1 = self.fig.add_axes([0.15, 0.01, 0.30, 0.05])
+            ## Format Toggle Buttons
+            button_ax1 = self.fig.add_axes([0.10, 0.01, 0.40, 0.05])
             button_ax2 = self.fig.add_axes([0.55, 0.01, 0.30, 0.05])
             button_ax3 = self.fig.add_axes([0.35, 0.07, 0.30, 0.05])
             button1 = Button(button_ax1, 'Toggle Small Obstacle Visibility')
@@ -252,61 +250,25 @@ class SearchEnv(Env):
         else:
             self.im.set_data(grid)
         
+
+
+
         # first we clear away our old patches
         for p in self.patches:
             p.remove()
         self.patches.clear()
         
-        # draw our science value label (how important the science is)
+        # Render science value label (how important the science is)
         if not self.science_found:
             sx, sy = self.science_pos
             assert self.ax is not None
             value_text = self.ax.text(sy, sx, str(self.science_value), ha = 'center', va = 'center', color = 'black', fontsize = 12, fontweight = 'bold', zorder = 20)
             self.patches.append(value_text)
-        
-        # Clear previous status texts
-        for t in self.status_texts:
-            t.remove()
-        self.status_texts = []
 
-        # Display Drone Info (Entropy & Action)
-        action_map = {0: 'Stay', 1: 'Collect Science', 2: 'Up', 3: 'Down', 4: 'Left', 
-                      5: 'Right', 6: 'Up-Right', 7: 'Up-Left', 8: 'Down-Right', 9: 'Down-Left'}
-        
-        for i, drone in enumerate(drones):
-            entropy = drone.belief_state.get_entropy()
-            action_code = drone.last_action
-            action_str = action_map.get(action_code, "None")
-            
-            text_color = 'black' 
-            font_weight = 'normal' 
-            bg_color = 'white' 
-            
-            status_str = f"Drone {drone.drone_id} | H: {entropy:.3f} | Action: {action_str}"
-            if drone.drifted:
-                status_str += " | DRIFTED!"
-            
-            # Place text below the plot
-            assert self.ax is not None
-            t = self.ax.text(0.05, -0.12 - (i * 0.06), status_str, 
-                             transform=self.ax.transAxes, fontsize=10, 
-                             color=text_color, fontweight=font_weight,
-                             bbox=dict(facecolor=bg_color, alpha=0.8, edgecolor='gray', boxstyle='round'))
-            self.status_texts.append(t)
-        
-        # TODO Fix later, Just me editing out more wind related stuff
-        # Draw wind direction arrow
-        # arrow_len = 1.5
-        # dx = np.sin(self.wind_direction) * arrow_len
-        # dy = np.cos(self.wind_direction) * arrow_len
-        # arrow = patches.Arrow(self.grid_size - 2.5, 2.5, dx, dy, width=0.5, color='black', zorder=10)
-        # self.ax.add_patch(arrow)
-        # self.patches.append(arrow)
-
-        # Draw the planned path if provided
+        # Render the planned path if provided
         if path is not None:
             for (r, c) in path:
-                # Draw small semi-transparent circles for the path
+                # Render small semi-transparent circles for the path
                 dot = patches.Circle(
                     (c, r), 0.2, 
                     color='red', alpha=0.3, zorder=5
@@ -334,35 +296,50 @@ class SearchEnv(Env):
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-        if self.record_frames:
+        if self.record_frames: self._record_frame()
+        
+        return self.fig
+
+    def _record_frame(self):
+        try:
             from matplotlib.backends.backend_agg import FigureCanvasAgg
             canvas = self.fig.canvas
-            assert isinstance(canvas, FigureCanvasAgg)
-            buf = canvas.buffer_rgba()
-            # Use buffer_rgba() as tostring_rgb() is deprecated/removed in newer Matplotlib
-            image = np.frombuffer(buf, dtype='uint8')
+            if isinstance(canvas, FigureCanvasAgg):
+                buf = canvas.buffer_rgba()
+                image = np.frombuffer(buf, dtype='uint8')
+            else:
+                import io
+                buf_io = io.BytesIO()
+                self.fig.savefig(buf_io, format='raw', dpi=self.fig.dpi)
+                buf_io.seek(0)
+                image = np.frombuffer(buf_io.getvalue(), dtype='uint8')
             
-            # Handle HiDPI scaling by calculating actual buffer dimensions
             w, h = self.fig.canvas.get_width_height()
             if len(image) != w * h * 4:
                 scale = (len(image) / (w * h * 4)) ** 0.5
-                w = int(w * scale)
-                h = int(h * scale)
+                w = int(round(w * scale))
+                h = int(round(h * scale))
             
             image = image.reshape((h, w, 4))
             image = image[:, :, :3].copy() # Convert RGBA to RGB
             self.frames.append(image)
-        
-        return self.fig
+        except Exception as e:
+            print(f"Warning: Failed to record frame: {e}")
 
 
     def save_gif(self, filename, fps=5):
         if self.frames:
-            imageio.mimsave(filename, self.frames, fps=fps)
+            try: # imageio v2
+                imageio.mimsave(filename, self.frames, fps=fps)
+            except TypeError: # imageio v3 no longer supports 'fps', uses 'duration' in ms
+                duration = 1000.0 / fps
+                imageio.mimsave(filename, self.frames, duration=duration, loop=0)
             print(f"Animation saved to {filename}")
 
 
-    def close(self):
+    def close(self, save_gif=False, filename="simulation.gif", fps=5):
+        if save_gif and self.frames:
+            self.save_gif(filename, fps=fps)
         if self.fig:
             plt.close(self.fig)
             self.fig = None

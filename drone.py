@@ -6,7 +6,6 @@ Implements intelligent decision-making for science search and extinguish
 import numpy as np
 from copy import deepcopy
 from environment import SearchEnv
-from belief import Belief
 from sensors import OnlineSensor
 from local_planner import *
 import config as cfg
@@ -24,7 +23,6 @@ class Drone:
 
         self.position = np.array([environment.grid_size - 2, environment.grid_size - 2])
         self.budget = cfg.MAX_BUDGET_PER_DRONE
-        self.belief_state = Belief(self.env.grid_size)
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
 
         self.time = 0
@@ -200,12 +198,6 @@ class Drone:
 
         science_observed = len(observations["detected_science"]) > 0
 
-        self.belief_state.update_from_observation(
-            self.position,
-            self.window_size,
-            science_observed,
-        )
-
         if science_observed:
             print(f"Drone {self.drone_id} found science objective!")
 
@@ -217,7 +209,6 @@ class Drone:
             "sender_id": self.drone_id,
             "timestamp": self.time,
             "position": self.position.copy(),
-            "belief_state": self.belief_state.copy(),
             "visited_cells": self.visited_cells.copy(),
             "history": deepcopy(self.history),
         }
@@ -228,209 +219,6 @@ class Drone:
         other_visited = packet["visited_cells"]
         self.visited_cells.update(other_visited)
 
-        if "belief_state" in packet:
-            self.belief_state.merge(packet["belief_state"])
-
-    def _get_best_value(self, belief, position, visited, depth):
-        """
-        Recursive helper to calculate the best Q-value from a given state
-        with limited lookahead.
-        """
-        if depth == 0:
-            return 0.0
-
-        max_q = -float("inf")
-        moves = {
-            2: (0, 1),
-            3: (0, -1),
-            4: (-1, 0),
-            5: (1, 0),
-            6: (1, 1),
-            7: (-1, 1),
-            8: (1, -1),
-            9: (-1, -1),
-        }
-
-        current_entropy = belief.get_entropy()
-
-        for _, (dx, dy) in moves.items():
-            nx = max(0, min(self.env.grid_size - 1, position[0] + dx))
-            ny = max(0, min(self.env.grid_size - 1, position[1] + dy))
-
-            half = self.window_size // 2
-            x_min = max(0, nx - half)
-            x_max = min(self.env.grid_size, nx + half + 1)
-            y_min = max(0, ny - half)
-            y_max = min(self.env.grid_size, ny + half + 1)
-
-            new_cells = sum(
-                1
-                for r in range(x_min, x_max)
-                for c in range(y_min, y_max)
-                if (r, c) not in visited
-            )
-
-            bonus = self.exploration_bonus if new_cells > 0 else 0
-            reward_action = bonus - self.movement_cost - self.time_cost
-
-            prob_see_science = np.sum(belief.belief_grid[x_min:x_max, y_min:y_max])
-            prob_see_nothing = 1.0 - prob_see_science
-
-            gain_see_science = current_entropy
-
-            temp_belief = belief.copy()
-            temp_belief.update_from_observation(
-                (nx, ny),
-                self.window_size,
-                science_found=False,
-            )
-            gain_see_nothing = current_entropy - temp_belief.get_entropy()
-
-            future_val = 0.0
-            if depth > 1 and prob_see_nothing > 0:
-                new_visited = visited.copy()
-                for r in range(x_min, x_max):
-                    for c in range(y_min, y_max):
-                        new_visited.add((r, c))
-
-                future_val = self._get_best_value(
-                    temp_belief,
-                    (nx, ny),
-                    new_visited,
-                    depth - 1,
-                )
-
-            val_nothing = gain_see_nothing + self.gamma * future_val
-            q = reward_action + self.gamma * (
-                prob_see_science * gain_see_science
-                + prob_see_nothing * val_nothing
-            )
-
-            if q > max_q:
-                max_q = q
-
-        return max_q
-
-    def decide_action_pomdp(self):
-        """
-        Lookahead POMDP planning.
-        Returns the action index with the highest Q-value.
-        """
-        
-        # working in our local optimizer
-        if len(self.known_small_obstacles) > 0 or len(self.known_small_science) > 0:
-            return self.local_optimizer.choose_action(self, self.env)
-
-        # If science has been seen, move directly toward it.
-        if len(self.known_science) > 0:
-            sx, sy = next(iter(self.known_science))
-
-            if self.x == sx and self.y == sy:
-                return 1  # Collect
-
-            dx = sx - self.x
-            dy = sy - self.y
-
-            if dx > 0 and dy > 0:
-                return 6  # Up-Right
-            elif dx < 0 and dy > 0:
-                return 7  # Up-Left
-            elif dx > 0 and dy < 0:
-                return 8  # Down-Right
-            elif dx < 0 and dy < 0:
-                return 9  # Down-Left
-            elif dy > 0:
-                return 2  # Up
-            elif dy < 0:
-                return 3  # Down
-            elif dx < 0:
-                return 4  # Left
-            elif dx > 0:
-                return 5  # Right
-
-        best_actions = [0]
-        max_q_value = -float("inf")
-
-        current_entropy = self.belief_state.get_entropy()
-
-        moves = {
-            2: (0, 1),
-            3: (0, -1),
-            4: (-1, 0),
-            5: (1, 0),
-            6: (1, 1),
-            7: (-1, 1),
-            8: (1, -1),
-            9: (-1, -1),
-        }
-
-        for action_idx, (dx, dy) in moves.items():
-            nx = max(0, min(self.env.grid_size - 1, self.x + dx))
-            ny = max(0, min(self.env.grid_size - 1, self.y + dy))
-
-            if self.env.is_obstacle(nx, ny):
-                continue
-
-            half = self.window_size // 2
-            x_min = max(0, nx - half)
-            x_max = min(self.env.grid_size, nx + half + 1)
-            y_min = max(0, ny - half)
-            y_max = min(self.env.grid_size, ny + half + 1)
-
-            new_cells = sum(
-                1
-                for r in range(x_min, x_max)
-                for c in range(y_min, y_max)
-                if (r, c) not in self.visited_cells
-            )
-
-            bonus = self.exploration_bonus if new_cells > 0 else 0
-            reward_action = bonus - self.movement_cost - self.time_cost
-
-            prob_see_science = np.sum(
-                self.belief_state.belief_grid[x_min:x_max, y_min:y_max]
-            )
-            prob_see_nothing = 1.0 - prob_see_science
-
-            gain_see_science = current_entropy
-
-            temp_belief = self.belief_state.copy()
-            temp_belief.update_from_observation(
-                (nx, ny),
-                self.window_size,
-                science_found=False,
-            )
-            gain_see_nothing = current_entropy - temp_belief.get_entropy()
-
-            future_val = 0.0
-            if self.lookahead_depth > 1 and prob_see_nothing > 0:
-                new_visited = self.visited_cells.copy()
-
-                for r in range(x_min, x_max):
-                    for c in range(y_min, y_max):
-                        new_visited.add((r, c))
-
-                future_val = self._get_best_value(
-                    temp_belief,
-                    (nx, ny),
-                    new_visited,
-                    self.lookahead_depth - 1,
-                )
-
-            val_nothing = gain_see_nothing + self.gamma * future_val
-            q_value = reward_action + self.gamma * (
-                prob_see_science * gain_see_science
-                + prob_see_nothing * val_nothing
-            )
-
-            if q_value > max_q_value:
-                max_q_value = q_value
-                best_actions = [action_idx]
-            elif np.isclose(q_value, max_q_value):
-                best_actions.append(action_idx)
-
-        return int(np.random.choice(best_actions))
-    
     def local_optimizer_needed(self, next_global_action = None):
         # checks to see if something is in the global path or if there's something worth deviating for, and then returns if a local optimizer is neede
         
