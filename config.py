@@ -31,18 +31,11 @@ NUM_SMALL_SCIENCE = GRID_SIZE // 4 # how many small science objectives are scatt
 SMALL_SCIENCE_MIN_VALUE = 1 # the minimum value of a small science objective
 SMALL_SCIENCE_MAX_VALUE = 5 # the maximum value of a small science objective
 
-# ===== Drone parameters ===== 
-LOOKAHEAD_DEPTH = 3
-
 # ===== Drone sensor parameters ===== 
 SENSOR_VIEW_DEPTH = 4
 SENSOR_VIEW_ANGLE = np.pi/2
 SENSOR_FALSE_NEGATIVE_RATE = 0.05
 SENSOR_FALSE_POSITIVE_RATE = 0.01
-
-# ===== Dec-POMDP parameters ===== 
-GAMMA = 0.95
-EXPLORATION_BONUS = 50.0  # Bonus reward for exploring new cells, promotes active exploration of new cells
 
 # === Cost parameters ===
 MOVEMENT_COST = 1.0
@@ -61,15 +54,3 @@ LOCAL_PLANNER_TYPE = "simulated_annealing" # options are simulated_annealing, cr
 # TODO LATER: rather than have to tune each weight individually, it could be good to just have different run types
 # for instance, we could have a "science-focused" run where science is weighted above a nominal value, or a "battery-focused" run and so on
 LOCAL_PLANNER_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0}
-
-# Initial, nominal parameters
-# Order: [W_dist, mu_dist, var_dist, mu_wind, var_wind, W_angle, var_wind_angle_change]
-MU_P = np.array([
-    1.0,                            # W_dist
-    0.50,                           # mu_dist
-    0.50,                           # var_dist
-    0.05,                           # mu_wind
-    0.01,                           # var_wind
-    1,                              # W_angle
-    1.0                             # var_wind_angle_change
-])

@@ -241,13 +241,10 @@ class SearchEnv(Env):
             button1 = Button(button_ax1, 'Toggle Small Obstacle Visibility', color="#f8a3a3", hovercolor="#f8a3a3")
             button2 = Button(button_ax2, 'Toggle Science Visibility', color="#f8a3a3", hovercolor="#f8a3a3")
             button3 = Button(button_ax3, 'Pause/Resume', color="#f8a3a3", hovercolor="#f8a3a3")
-
             button1.on_clicked(self.toggle_small_obstacles)
             button2.on_clicked(self.toggle_science)
             button3.on_clicked(self.toggle_pause)
-
             self.buttons = [button1, button2, button3]
-
 
             plt.ion()
             plt.show(block=False)

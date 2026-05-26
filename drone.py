@@ -4,7 +4,6 @@ Implements intelligent decision-making for science search and extinguish
 """
 
 import numpy as np
-from copy import deepcopy
 from environment import SearchEnv
 from sensors import OnlineSensor
 from local_planner import *
@@ -12,30 +11,19 @@ import config as cfg
 
 
 class Drone:
-    """
-    Dec-POMDP Agent with belief state and value-based decision making.
-    """
-
     def __init__(self, environment: SearchEnv):
         self.env = environment
 
         self.position = np.array([environment.grid_size - 2, environment.grid_size - 2])
+        self.heading = 0.0
         self.budget = cfg.MAX_BUDGET
-        self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
 
         self.time = 0
         self.visited_cells = set()
         self.last_action = None
         self.science_found = False
-        self.drifted = False
         self.history = []
         self.stuck_count = 0
-
-        # POMDP params
-        self.gamma = 0.0
-        self.exploration_bonus = 0.0
-        self.movement_cost = 0.0
-        self.time_cost = 0.0
 
         # Sensor params
         self.sensor = OnlineSensor(
@@ -45,7 +33,6 @@ class Drone:
             false_positive_rate=cfg.SENSOR_FALSE_POSITIVE_RATE,
         )
 
-        self.heading = 0.0
         self.known_small_obstacles = set()
         self.known_science = set()
         
@@ -54,10 +41,24 @@ class Drone:
         
         self.current_visible_cells = set()
 
-        self.science_found = self.observe()
-        if not self.history:
-            self.history.append(self.state)
-            
+        # For free, observe the surrounding area at spawn
+        aggregated_observations = {
+            "visible_cells": [],
+            "detected_obstacles": [],
+            "detected_science": [],
+            "detected_small_science": [],
+            "missed_cells": [],
+        }
+        for i in range(8):
+            single_observation = self.sensor.observe(
+                self.position,
+                self.heading + i*np.pi/4,
+                self.env
+            )
+            for key, value in single_observation.items():
+                aggregated_observations[key].extend(value)
+        self.science_found = self.observe(aggregated_observations)
+        
         self.local_optimizer = SimulatedAnnealingOptimizer(horizon = 5, iterations = 100, initial_temp = 10.0, cooling = 0.95, weights = cfg.LOCAL_PLANNER_WEIGHTS)
 
     @property
@@ -67,10 +68,6 @@ class Drone:
     @property
     def y(self):
         return self.position[1]
-
-    @property
-    def state(self):
-        return [self.x, self.y, self.science_found]
 
     def action(self, action):
         """Execute action and update state."""
@@ -153,16 +150,16 @@ class Drone:
         if not self.env.science_collected:
             self.science_found = self.observe()
 
-        self.history.append(self.state)
         self.time += 1
 
-    def observe(self):
+    def observe(self, observations = None):
         """Update belief based on online sensor observation."""
-        observations = self.sensor.observe(
-            drone_pos=self.position,
-            heading=self.heading,
-            environment=self.env,
-        )
+        if observations == None:
+            observations = self.sensor.observe(
+                drone_pos=self.position,
+                heading=self.heading,
+                environment=self.env,
+            )
         
         self.current_visible_cells = set(observations["visible_cells"])
 

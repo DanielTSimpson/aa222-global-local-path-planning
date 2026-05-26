@@ -17,14 +17,9 @@ def initialize_drone(env):
         Drone: finalized Drone object
     """
     drone = Drone(env)
-    drone.gamma = cfg.GAMMA
-    drone.exploration_bonus = cfg.EXPLORATION_BONUS 
     drone.movement_cost = cfg.MOVEMENT_COST
     drone.time_cost = cfg.TIME_COST    
-    drone.position = np.array([env.grid_size - 2, env.grid_size - 2])
-    drone.visited_cells = {(drone.position[0], drone.position[1])}
-    drone.science_found = drone.observe()
-    drone.history = [drone.state]
+    drone.visited_cells.add(tuple(drone.position))
 
     return drone
 
@@ -129,11 +124,6 @@ def optimize():
 
 
 if __name__ == '__main__':
-    # TODO: Make the drone's observation window forward facing 
-        # This implies TODO: Add orientation to the drone's state
-    # TODO: Remove exploration POMDP and implement obstacle handling instead
-    # TODO: Potentially, make the local sensor lock the orientation to the agent's movement? Makes it slightly more accurate it many real world scenarios and could simplify the problem?
-    mu_p = cfg.MU_P
     simulate_astar(render = 2, save_gif=True)
     plt.show(block=True)
     optimize()
