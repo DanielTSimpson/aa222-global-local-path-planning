@@ -59,7 +59,7 @@ class Drone:
                 aggregated_observations[key].extend(value)
         self.science_found = self.observe(aggregated_observations)
         
-        self.local_optimizer = SimulatedAnnealingOptimizer(horizon = 5, iterations = 100, initial_temp = 10.0, cooling = 0.95, weights = cfg.LOCAL_PLANNER_WEIGHTS)
+        self.local_optimizer = make_local_planner(cfg.LOCAL_PLANNER_TYPE) 
 
     @property
     def x(self):

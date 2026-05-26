@@ -7,6 +7,22 @@ import config as cfg
 
 MOVES = {2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}
 
+def make_local_planner(planner_type):
+    # this is what'll be called in drone.py rather than having to pick a certain local planner explicitly
+    # instead, we'll just make a call to this function and everything is taken care of here
+    if planner_type == "simulated_annealing":
+        return SimulatedAnnealingOptimizer(horizon=5, iterations=100, initial_temp=10.0, cooling=0.95, weights=cfg.SIMANNEAL_WEIGHTS)
+
+    if planner_type == "cross_entropy":
+        return CrossEntropyOptimizer(horizon=5, num_samples=100, num_elites=10, iterations=5, smoothing=0.7, weights=cfg.CEM_WEIGHTS)
+
+    # TODO this part isn't done yet
+    if planner_type == "genetic":
+        weights = cfg.GENETIC_WEIGHTS
+        return None
+
+    raise ValueError(f"Unknown planner type: {planner_type}") 
+
 def rollout(position, actions, env):
     # this function rolls out a collection of actions from the current position and returns candidate paths
     pos = np.array(position).copy()
@@ -108,3 +124,66 @@ class SimulatedAnnealingOptimizer:
         
         return int(best[0]) # finally, we return the first action in the best path we ended up with
         
+class CrossEntropyOptimizer:
+    def __init__(self, horizon = 5, num_samples = 100, num_elites = 10, iterations = 5, smoothing = 0.7, weights = None):
+        self.horizon = horizon
+        self.num_samples = num_samples
+        self.num_elites = num_elites
+        self.iterations = iterations
+        self.smoothing = smoothing
+        self.weights = weights or {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 2.0, "recovery": 10.0}
+        self.action_list = list(MOVES.keys())
+
+    def choose_action(self, drone, env):
+        # TODO write a description here
+        num_actions = len(self.action_list)
+
+        # we initialize with a uniform distribution over every action at each timestep
+        probs = np.ones((self.horizon, num_actions)) / num_actions
+
+        # first we iterate over the number of, you guessed it, iterations we want to try optimize over
+        for _ in range(self.iterations):
+            samples = []
+            costs = []
+
+            # then, we draw however many samples we need to try and paint a clear picture of the solution space
+            for _ in range(self.num_samples):
+                action_sequence = []
+
+                # then we pick a set of probablistic actions in accordance with our probability distribution
+                # the plan is we, hopefully, move towards a better and better representation of the solution space as we generate more and more samples
+                for t in range(self.horizon):
+                    action_idx = np.random.choice(num_actions, p = probs[t])
+                    action_sequence.append(self.action_list[action_idx])
+
+                action_sequence = np.array(action_sequence)
+
+                path = rollout(drone.position, action_sequence, env)
+                cost = cost_path(path, drone, env, self.weights)
+
+                samples.append(action_sequence)
+                costs.append(cost)
+            
+            costs = np.array(costs)
+
+            # now we select the best performing samples to try and inform our next selection
+            elite_indices = np.argsort(costs)[:self.num_elites]
+            elite_samples = [samples[i] for i in elite_indices]
+
+            new_probs = np.zeros_like(probs)
+
+            # here we go ahead and update our probability distribution
+            for t in range(self.horizon):
+                for action_index, action in enumerate(self.action_list):
+                    count = sum(sample[t] == action for sample in elite_samples)
+                    new_probs[t, action_index] = count / self.num_elites
+
+            # smoothing out the probability distribution because it was being a pain in the ass beforehand
+            probs = (self.smoothing * probs + (1.0 - self.smoothing) * new_probs)
+
+            # dancing around exact zeros
+            probs += 1e-6
+            probs /= probs.sum(axis=1, keepdims=True)
+        
+        best_action_index = np.argmax(probs[0])
+        return int(self.action_list[best_action_index])
