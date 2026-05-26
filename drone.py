@@ -17,12 +17,11 @@ class Drone:
     """
 
     def __init__(self, environment: SearchEnv):
-        self.drone_id = 0
         self.window_size = cfg.OBSERVATION_WINDOW_SIZE
         self.env = environment
 
         self.position = np.array([environment.grid_size - 2, environment.grid_size - 2])
-        self.budget = cfg.MAX_BUDGET_PER_DRONE
+        self.budget = cfg.MAX_BUDGET
         self.lookahead_depth = cfg.LOOKAHEAD_DEPTH
 
         self.time = 0
@@ -128,22 +127,6 @@ class Drone:
             y = max(0, self.y - 1)
             self.heading = -3 * np.pi / 4
 
-        self.drifted = False
-
-        if cfg.ENABLE_WIND and np.random.random() < abs(self.env.wind_speed):
-            cos_wind = np.cos(self.env.wind_direction)
-            sin_wind = np.sin(self.env.wind_direction)
-
-            dx = int(np.sign(cos_wind)) if np.random.random() < abs(cos_wind) else 0
-            dy = int(np.sign(sin_wind)) if np.random.random() < abs(sin_wind) else 0
-
-            if dx != 0 or dy != 0:
-                self.drifted = True
-                x = max(0, min(self.env.grid_size - 1, x + dx))
-                y = max(0, min(self.env.grid_size - 1, y + dy))
-
-            if self.env.obstacle_grid[x, y] == 1:
-                x, y = prev_position
 
         candidate = np.array([x, y])
 
@@ -161,7 +144,7 @@ class Drone:
                     self.env.collected_small_science.add(current_cell)
                     self.known_small_science.discard(current_cell)
 
-                    print(f"Drone {self.drone_id} collected small science at {current_cell} worth {value}")
+                    print(f"Drone collected small science at {current_cell} worth {value}")
 
         if np.array_equal(self.position, prev_position):
             self.stuck_count += 1
@@ -199,25 +182,9 @@ class Drone:
         science_observed = len(observations["detected_science"]) > 0
 
         if science_observed:
-            print(f"Drone {self.drone_id} found science objective!")
+            print("Drone found science objective!")
 
         return science_observed
-
-    def create_telemetry_packet(self):
-        """Creates telemetry packet with belief state."""
-        packet = {
-            "sender_id": self.drone_id,
-            "timestamp": self.time,
-            "position": self.position.copy(),
-            "visited_cells": self.visited_cells.copy(),
-            "history": deepcopy(self.history),
-        }
-        return packet
-
-    def receive_telemetry(self, packet, communication_noise=0.1):
-        """Receive and merge belief states."""
-        other_visited = packet["visited_cells"]
-        self.visited_cells.update(other_visited)
 
     def local_optimizer_needed(self, next_global_action = None):
         # checks to see if something is in the global path or if there's something worth deviating for, and then returns if a local optimizer is neede

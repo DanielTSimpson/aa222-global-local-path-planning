@@ -32,7 +32,6 @@ SMALL_SCIENCE_MIN_VALUE = 1 # the minimum value of a small science objective
 SMALL_SCIENCE_MAX_VALUE = 5 # the maximum value of a small science objective
 
 # ===== Drone parameters ===== 
-NUM_DRONES = 1
 OBSERVATION_WINDOW_SIZE = 3
 LOOKAHEAD_DEPTH = 3
 
@@ -54,7 +53,7 @@ TIME_COST = 3.0
 INITIAL_TIME = 0.0
 TIME_STEP = 0.05
 MAX_SIMULATION_TIME = 250.0
-MAX_BUDGET_PER_DRONE = 5000 * NUM_DRONES
+MAX_BUDGET = 5000
 RENDER_PAUSE = 0.05
 
 # ===== Local planner parameters =====

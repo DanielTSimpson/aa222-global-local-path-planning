@@ -19,7 +19,6 @@ def initialize_drone(env, window_size):
     """
     drone = Drone(env)
 
-    drone.drone_id = 1
     drone.window_size = window_size
     drone.gamma = cfg.GAMMA
     drone.exploration_bonus = cfg.EXPLORATION_BONUS 
@@ -75,12 +74,12 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
 
     for i in range(N):
         if render == 2 or save_gif:
-            env.render([drone], path=reconstructed_path)
+            env.render(drone, path=reconstructed_path)
             if render == 2:
                 plt.pause(render_pause)
         
         while env.paused:
-            env.render([drone], path=reconstructed_path)
+            env.render(drone, path=reconstructed_path)
             plt.pause(0.1)
         
         # Check for budget failure (Mode 1)
@@ -97,7 +96,7 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
             if render == 1 or render == 2:
                 print(f"\tScience collected! Completed in {time_to_obj*dt} time units")
                 if render == 2:
-                    env.render([drone], path=reconstructed_path)
+                    env.render(drone, path=reconstructed_path)
                     plt.pause(5)
             break
         

@@ -18,8 +18,6 @@ class SearchEnv(Env):
     """Multi-agent search environment with Dec-POMDP framework"""
     def __init__(self, grid_size=20):
         self.grid_size = grid_size # The side length of the square grid-world
-        self.wind_speed = 0.0 # The probability of the wind moving drones
-        self.wind_direction = 0.0 # The direction the wind would bias drone movement in radians
         self.terrain = {"FREE": 0, "OBJECTIVE": 1, "BUFFER ZONE": 2, "LARGE OBSTACLE": 3, "SMALL OBSTACLE": 4}
         self.the_grid = np.zeros((self.grid_size, self.grid_size), dtype = int) # NpArray of the grid
 
@@ -32,29 +30,31 @@ class SearchEnv(Env):
         self.science_found = False
         self.science_collected = False
 
+        # Small Science Definition
+        self.small_science = {}
+        self.collected_small_science = set()
+
         # Start zone definition
         self.the_grid[self.grid_size - 5 : self.grid_size, 
                       self.grid_size - 5 : self.grid_size] = self.terrain["BUFFER ZONE"]
 
+        ## Rendering Parameters
         self.patches = []
         self.fig, self.ax = None, None
         self.status_texts = []
         self.frames = []
         self.record_frames = False
-        
-        # setting a toggleable option for showing the user small obstacles the drone hasn't observed yet
-        self.show_hidden_small_obstacles = False 
-        self.show_hidden_science = False
         self.buttons = []
         
-        # adding in the small scienc objectives scattered throughout the map
-        self.small_science = {}
-        self.collected_small_science = set()
+        # Setting a toggleable option for showing the user small obstacles the drone hasn't observed yet
+        self.show_hidden_small_obstacles = False 
+        self.show_hidden_science = False
+        
+        # adding in the small science objectives scattered throughout the map
         self.show_hidden_small_science = False
         
         # adding a pause button
         self.paused = False
-
 
     def reset_obstacles(self):
         # clears existing obstacles from the environment, called before generating a new map
@@ -64,26 +64,21 @@ class SearchEnv(Env):
         self.obstacle_grid = np.clip(self.large_obstacles + self.small_obstacles, 0, 1)
         self.obstacles = []
 
-
     def in_bounds(self, r, c):
         # checks if a given cell, with coordinates row r and column c, is inside the environment
         return 0 <= r < self.grid_size and 0 <= c < self.grid_size
     
-
     def is_obstacle(self, r, c):
         # just returns whether or not the cell at row r and column c is an obstacle or free/protected space
         return (self.the_grid[r, c] == self.terrain["LARGE OBSTACLE"] or self.the_grid[r, c] == self.terrain["SMALL OBSTACLE"])
     
-
     def is_free(self, r, c):
         # returns whether or not the cell at row r and column c is a free space
         return self.the_grid[r, c] == self.terrain["FREE"]
     
-
     def is_buffer(self, r, c):
         # returns whether the cell is in a buffer zone
         return self.the_grid[r, c] == self.terrain["BUFFER ZONE"]
-
 
     def _sample_obstacle_size(self, mu, sigma, min_size = 1, max_size = None):
         # lets us draw obstacle sizes from the small or large obstacle size distributions we define in the config file
@@ -94,7 +89,6 @@ class SearchEnv(Env):
         height = int(round(np.random.normal(mu, sigma)))
         clipped = np.clip([width, height], min_size, max_size)
         return int(clipped[0]), int(clipped[1])
-    
 
     def generate_small_science(self, num_small_science = 10, min_value = 1, max_value =5):
         # populates the grid world with small science objectives, forcing the drone to explore more if it comes across one
@@ -118,7 +112,6 @@ class SearchEnv(Env):
             self.small_science[cell] = value
             
             placed += 1
-    
 
     def spawn_obstacle(self, obs_type, mu, sigma, type = None):
         w, h = self._sample_obstacle_size(mu, sigma)
@@ -141,7 +134,6 @@ class SearchEnv(Env):
         c = valid_x[random_idx]
         self.the_grid[r : r+h, c : c+w] = obs_type
         return (r, c, w, h)
-    
     
     def generate_obstacles(self, num_large = 5, num_small = 15, large_mu = 4, large_sigma = 1.0, small_mu = 1.5, small_sigma = 0.5):
         [self.spawn_obstacle(self.terrain["LARGE OBSTACLE"], large_mu, large_sigma, type = "Gaussian") for _ in range(num_large)]
@@ -172,12 +164,15 @@ class SearchEnv(Env):
             self.fig.canvas.draw_idle()
             self.fig.canvas.flush_events()
 
-    def render(self, drones, path=None):
+    def render(self, drone, path=None):
+        # Reset rendering parameters
+        for p in self.patches:
+            p.remove()
+        self.patches.clear()
         grid = np.zeros((self.grid_size, self.grid_size))        
         large_obs_val = self.terrain.get("LARGE OBSTACLE", 3) #Get the value for large obstacles
         small_obs_val = self.terrain.get("SMALL OBSTACLE", 4) #Get the value for small obstacles
         
-
         # ==== LABELING OBJECTS IN THE GRID ===
         ## Label large obstacles
         grid[self.the_grid == large_obs_val] = 7
@@ -185,11 +180,10 @@ class SearchEnv(Env):
         if self.show_hidden_small_obstacles:
             grid[self.the_grid == small_obs_val] = 8
         else:
-            for drone in drones:
-                for (r, c) in drone.known_small_obstacles:
-                    grid[r, c] = 8
+            for (r, c) in drone.known_small_obstacles:
+                grid[r, c] = 8
         ## Label large science
-        science_visible_to_drone = any(tuple(self.science_pos) in getattr(drone, "known_science", set()) for drone in drones)
+        science_visible_to_drone = tuple(self.science_pos) in getattr(drone, "known_science", set())
         if self.show_hidden_science or science_visible_to_drone:
             grid[tuple(self.science_pos)] = 2
         ## Label small science
@@ -199,24 +193,20 @@ class SearchEnv(Env):
                     if (r, c) not in self.collected_small_science:
                         grid[r, c] = 9
             else:
-                for drone in drones:
-                    for (r, c) in drone.known_small_science:
-                        if (r, c) not in self.collected_small_science:
-                            grid[r, c] = 9
+                for (r, c) in drone.known_small_science:
+                    if (r, c) not in self.collected_small_science:
+                        grid[r, c] = 9
         ## Label explored cells
-        for drone in drones:
-            for (r, c) in drone.visited_cells:
-                if self.the_grid[r, c] != large_obs_val and self.the_grid[r, c] != small_obs_val: # only mark cells as explored if they're not an obstacle -- otherwise we're overwriting those grids visually
-                    grid[r, c] = 1   
+        for (r, c) in drone.visited_cells:
+            if self.the_grid[r, c] != large_obs_val and self.the_grid[r, c] != small_obs_val: # only mark cells as explored if they're not an obstacle -- otherwise we're overwriting those grids visually
+                grid[r, c] = 1   
         ## Label currently cells visible to the agent
-        for drone in drones:
-            if hasattr(drone, "current_visible_cells"):
-                for (r, c) in drone.current_visible_cells:
-                    if not self.is_obstacle(r, c): # we want to make sure we don't overwrite obstacle colors with the visible cell color
-                        grid[r, c] = 6
-        ## Label the agent itself            
-        for idx, drone in enumerate(drones):
-            grid[tuple(drone.position)] = idx + 3
+        if hasattr(drone, "current_visible_cells"):
+            for (r, c) in drone.current_visible_cells:
+                if not self.is_obstacle(r, c): # we want to make sure we don't overwrite obstacle colors with the visible cell color
+                    grid[r, c] = 6
+        ## Label the agent itself
+        grid[tuple(drone.position)] = 3
 
 
         # ===== FORMATTING THE PLOT =====
@@ -251,21 +241,14 @@ class SearchEnv(Env):
             self.im.set_data(grid)
         
 
-
-
-        # first we clear away our old patches
-        for p in self.patches:
-            p.remove()
-        self.patches.clear()
-        
-        # Render science value label (how important the science is)
+        # ===== RENDERING THE ENVIRONMENT =====
+        ## Render science value label (how important the science is)
         if not self.science_found:
             sx, sy = self.science_pos
             assert self.ax is not None
             value_text = self.ax.text(sy, sx, str(self.science_value), ha = 'center', va = 'center', color = 'black', fontsize = 12, fontweight = 'bold', zorder = 20)
             self.patches.append(value_text)
-
-        # Render the planned path if provided
+        ## Render the planned path if provided
         if path is not None:
             for (r, c) in path:
                 # Render small semi-transparent circles for the path
@@ -276,28 +259,12 @@ class SearchEnv(Env):
                 assert self.ax is not None
                 self.ax.add_patch(dot)
                 self.patches.append(dot)
-
-        for drone in drones:
-            corner_x = drone.x - drone.window_size // 2 - 0.5
-            corner_y = drone.y - drone.window_size // 2 - 0.5
-
-            rectangle = patches.Rectangle(
-                (corner_y, corner_x),
-                drone.window_size,
-                drone.window_size,
-                linewidth=2,
-                edgecolor='black',
-                facecolor='none'
-            )
-            assert self.ax is not None
-            self.ax.add_patch(rectangle)
-            self.patches.append(rectangle)
-        
+        ## Render the whole plot and update any queued tasks 
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
-
         if self.record_frames: self._record_frame()
         
+
         return self.fig
 
     def _record_frame(self):
@@ -326,7 +293,6 @@ class SearchEnv(Env):
         except Exception as e:
             print(f"Warning: Failed to record frame: {e}")
 
-
     def save_gif(self, filename, fps=5):
         if self.frames:
             try: # imageio v2
@@ -335,7 +301,6 @@ class SearchEnv(Env):
                 duration = 1000.0 / fps
                 imageio.mimsave(filename, self.frames, duration=duration, loop=0)
             print(f"Animation saved to {filename}")
-
 
     def close(self, save_gif=False, filename="simulation.gif", fps=5):
         if save_gif and self.frames:
