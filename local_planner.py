@@ -50,9 +50,17 @@ def cost_path(path, drone, env, weights):
             distances = [abs(cell[0] - p[0]) + abs(cell[1] - p[1]) for p in drone.global_path]
             path_deviation_cost += min(distances) # we take the minimum distance from the cell to any point in the global path as our deviation cost
     
+        # keep running into issues where the drone wanders and wanders around the same area without approaching the final destination
+        # this hopefully helps with that some
+        recovery_cost = 0.0
+        final_cell = path[-1]
+        future_path = drone.global_path[getattr(drone, "global_path_index", 0):]
+        if len(future_path) > 0:
+            recovery_cost = min(abs(final_cell[0] - p[0]) + abs(final_cell[1] - p[1]) for p in future_path)
+
     # now we incorporate the weights we have set for this run
     # the first 3 terms are things we don't want, so they're additive. the last 2 terms are things we do want, so they're subtractive
-    total_score = (weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty + weights["path"] * path_deviation_cost) - (weights["science"] * science_reward + weights["explore"] * exploration_reward)
+    total_score = (weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty + weights["path"] * path_deviation_cost + weights["recovery"] * recovery_cost) - (weights["science"] * science_reward + weights["explore"] * exploration_reward)
     return total_score
 
 # now we add in our different optimization algorithms

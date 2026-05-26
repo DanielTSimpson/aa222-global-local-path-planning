@@ -87,9 +87,13 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
                     env.render(drone, path=reconstructed_path)
                     plt.pause(5)
             break
+
+        # calculates our distance from the end to fuel decision making in our local optimizer
+        if hasattr(drone, "global_path"):
+            drone.global_path_index = min(range(len(drone.global_path)), key = lambda k: abs(drone.x - drone.global_path[k][0]) + abs(drone.y - drone.global_path[k][1]))
         
         # here, the global action is computed via A*
-        global_action = drone_instructions[i] if i < len(drone_instructions) else drone.action(1)
+        global_action = drone_instructions[i] if i < len(drone_instructions) else 1
         
         # then, we see if this leads to one of the local planning optimizers needing to kick in (via an obstacle, science, etc.)
         if drone.local_optimizer_needed(global_action):
@@ -107,6 +111,11 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
                 print("\tFAILURE: Drones got Stuck")
             break
 
+    # hi, this section is for the monte carlo scheme
+    total_cost = cfg.MAX_BUDGET - drone.budget
+    total_time = time_to_obj * dt
+    small_science_value = drone.small_science_collected_value
+
     if failure_mode == 2 and (render == 1 or render == 2):
         print("\tFAILURE: Exceeded max sim time")
     
@@ -116,6 +125,8 @@ def simulate_astar(trial_num = 0, render=0, save_gif=False):
         env.close(save_gif=save_gif, filename=f"simulation_trial_{trial_num}.gif", fps=gif_fps)
     else:
         env.close()
+
+    return failure_mode, total_cost, total_time, small_science_value
 
 
 def optimize():
