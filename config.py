@@ -37,6 +37,18 @@ SENSOR_VIEW_ANGLE = np.pi/2
 SENSOR_FALSE_NEGATIVE_RATE = 0.05
 SENSOR_FALSE_POSITIVE_RATE = 0.01
 
+# ===== Movement parameters =====
+MOVES = {
+    2: (0, 1),   # Up
+    3: (0, -1),  # Down
+    4: (-1, 0),  # Left
+    5: (1, 0),   # Right
+    6: (1, 1),   # Up-Right
+    7: (-1, 1),  # Up-Left
+    8: (1, -1),  # Down-Right
+    9: (-1, -1)  # Down-Left
+}
+
 # === Cost parameters ===
 MOVEMENT_COST = 1.0
 TIME_COST = 3.0

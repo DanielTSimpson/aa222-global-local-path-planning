@@ -5,8 +5,6 @@ import config as cfg
 # that way, we can compare them against each other when subjected to different metrics
 # things like calculation time, score at end of the simulation, frequency of obstacle collisions, etc.
 
-MOVES = {2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}
-
 def make_local_planner(planner_type):
     # this is what'll be called in drone.py rather than having to pick a certain local planner explicitly
     # instead, we'll just make a call to this function and everything is taken care of here
@@ -30,7 +28,7 @@ def rollout(position, actions, env):
     
     # from our current position, we iterate through the possible actions the drone could take
     for action in actions:
-        dx, dy = MOVES[action]
+        dx, dy = cfg.MOVES[action]
         candidate = np.array([pos[0] + dx, pos[1] + dy])
         
         # this just guarantees that the drone stays within the bounds of the grid
@@ -92,7 +90,7 @@ class SimulatedAnnealingOptimizer:
     def choose_action(self, drone, env):
         # choose action is the actual simmulated annealing optimization schema
         
-        action_list = list(MOVES.keys())
+        action_list = list(cfg.MOVES.keys())
         
         # we begin with some completely random path which passes out to our horizon
         current = np.random.choice(action_list, size = self.horizon)
@@ -132,7 +130,7 @@ class CrossEntropyOptimizer:
         self.iterations = iterations
         self.smoothing = smoothing
         self.weights = weights or {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 2.0, "recovery": 10.0}
-        self.action_list = list(MOVES.keys())
+        self.action_list = list(cfg.MOVES.keys())
 
     def choose_action(self, drone, env):
         # TODO write a description here
