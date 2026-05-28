@@ -12,6 +12,7 @@ class GPS():
         self.gps_map = np.bitwise_or((environment.the_grid == environment.terrain["LARGE OBSTACLE"]), 
                         (environment.the_grid == environment.terrain["OBJECTIVE"])).astype(int)
         self.open_map = (environment.the_grid != environment.terrain["LARGE OBSTACLE"]).astype(int)
+        self.large_obstacles = environment.terrain["LARGE OBSTACLE"]
         self.drone_position = drone.position
         self.objective_position = environment.science_pos
 

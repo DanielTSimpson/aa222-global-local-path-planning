@@ -61,12 +61,12 @@ MAX_BUDGET = 5000
 RENDER_PAUSE = 0.05
 
 # ===== Local planner parameters =====
-LOCAL_PLANNER_TYPE = "cross_entropy" # options are simulated_annealing, cross_entropy, and genetic
+LOCAL_PLANNER_TYPE = "pomdp" # options are simulated_annealing, cross_entropy, genetic, and pomdp
 
 # TODO LATER: rather than have to tune each weight individually, it could be good to just have different run types
 # for instance, we could have a "science-focused" run where science is weighted above a nominal value, or a "battery-focused" run and so on
 SIMANNEAL_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0, "recovery": 10.0}
-CEM_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0, "recovery": 10.0}
+CEM_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0, "recovery": 3.0}
 
 # ===== Logging/Terminal Output =====
 VERBOSE_LOGGING = False

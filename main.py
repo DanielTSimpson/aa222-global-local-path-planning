@@ -97,7 +97,7 @@ def simulate(trial_num = 0, render=False, save_gif=False):
         global_action = drone_instructions[drone.global_path_index] if getattr(drone, "global_path_index", 0) < len(drone_instructions) else 1
         # then, we see if this leads to one of the local planning optimizers needing to kick in (via an obstacle, science, etc.)
         if drone.local_optimizer_needed(global_action):
-            action = drone.local_optimizer.choose_action(drone, env)
+            action = drone.local_optimizer.choose_action(drone, gps, env)
         else:
             action = global_action
         drone.action(action)

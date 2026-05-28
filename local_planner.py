@@ -1,5 +1,6 @@
 import numpy as np
 import config as cfg
+import itertools
 
 # the purpose of this script is to set up a bunch of different local optimization algorithms for the drone
 # that way, we can compare them against each other when subjected to different metrics
@@ -12,7 +13,10 @@ def make_local_planner(planner_type):
         return SimulatedAnnealingOptimizer(horizon=5, iterations=100, initial_temp=10.0, cooling=0.95, weights=cfg.SIMANNEAL_WEIGHTS)
 
     if planner_type == "cross_entropy":
-        return CrossEntropyOptimizer(horizon=5, num_samples=100, num_elites=10, iterations=5, smoothing=0.7, weights=cfg.CEM_WEIGHTS)
+        return CrossEntropyOptimizer(horizon=10, num_samples=100, num_elites=10, iterations=5, smoothing=0.7, weights=cfg.CEM_WEIGHTS)
+
+    if planner_type == "pomdp":
+        return POMDP(horizon=3, num_simulations=50, weights=cfg.CEM_WEIGHTS)
 
     # TODO this part isn't done yet
     if planner_type == "genetic":
@@ -73,8 +77,8 @@ def cost_path(path, drone, env, weights):
             recovery_cost = min(abs(final_cell[0] - p[0]) + abs(final_cell[1] - p[1]) for p in future_path)
 
     # now we incorporate the weights we have set for this run
-    # the first 3 terms are things we don't want, so they're additive. the last 2 terms are things we do want, so they're subtractive
-    total_score = (weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty + weights["path"] * path_deviation_cost + weights["recovery"] * recovery_cost) - (weights["science"] * science_reward + weights["explore"] * exploration_reward)
+    # the first 3 terms are things we don't want, so they're additive. the last 2 terms are things we do want, so they're subtractive # removed + weights["path"] * path_deviation_cost for the time being
+    total_score = (weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty  + weights["recovery"] * recovery_cost) - (weights["science"] * science_reward + weights["explore"] * exploration_reward)
     return total_score
 
 # now we add in our different optimization algorithms
@@ -87,7 +91,7 @@ class SimulatedAnnealingOptimizer:
         self.cooling = cooling
         self.weights = weights or {"science": 10.0, "explore": 1.0, "battery": 1.0, "obstacle": 100.0}
         
-    def choose_action(self, drone, env):
+    def choose_action(self, drone, gps, env):
         # choose action is the actual simmulated annealing optimization schema
         
         action_list = list(cfg.MOVES.keys())
@@ -132,7 +136,7 @@ class CrossEntropyOptimizer:
         self.weights = weights or {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 2.0, "recovery": 10.0}
         self.action_list = list(cfg.MOVES.keys())
 
-    def choose_action(self, drone, env):
+    def choose_action(self, drone, gps, env):
         # TODO write a description here
         num_actions = len(self.action_list)
 
@@ -185,3 +189,70 @@ class CrossEntropyOptimizer:
         
         best_action_index = np.argmax(probs[0])
         return int(self.action_list[best_action_index])
+    
+
+class POMDP:  # This guy just keeps looping around the same three points. 
+    def __init__(self, horizon = 3, num_simulations = 100, weights=None):
+        self.horizon = horizon
+        self.num_simulations = num_simulations
+        self.weights = weights or {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 2.0, "recovery": 10.0}
+        self.action_list = list(cfg.MOVES.keys())
+        self.fn_rate = cfg.SENSOR_FALSE_NEGATIVE_RATE
+        self.fp_rate = cfg.SENSOR_FALSE_POSITIVE_RATE
+    
+    def extract_state_and_belief(self, drone, gps):
+        agent_state = {
+            "position": drone.position.copy(),
+            "heading": drone.heading
+        }
+        belief_state = {
+            "visited": drone.visited_cells.copy(),
+            "large_obstacles": np.argwhere(gps.large_obstacles > 0).tolist(),
+            "small_obstacles": drone.known_small_obstacles.copy(),
+            "known_science": drone.known_small_science.copy()
+        }
+        return agent_state, belief_state
+
+    def sample_environment_from_belief(self, belief_state):
+        sampled_obstacles = set()
+
+        for cell in belief_state["visited"]:
+            if cell in belief_state["small_obstacles"]:
+                if np.random.random() > self.fp_rate:
+                    sampled_obstacles.add(cell)
+                elif np.random.random() < self.fn_rate:
+                    sampled_obstacles.add(cell)
+        def is_obstacle_mock(r, c):
+            if (r, c) in sampled_obstacles:
+                return True
+            return False
+        return is_obstacle_mock
+    
+    def choose_action(self, drone, gps, env):
+        agent_state, belief_state = self.extract_state_and_belief(drone, gps)
+        action_scores = {action: 0.0 for action in self.action_list}
+
+        all_combinations = list(itertools.product(self.action_list, repeat=self.horizon))
+
+        for _ in range(self.num_simulations):
+            is_obstacle_mock = self.sample_environment_from_belief(belief_state)
+
+            best_cost_for_action = {action: float('inf') for action in self.action_list}
+
+            original_is_obstacle = env.is_obstacle
+            env.is_obstacle = is_obstacle_mock
+
+            for combo in all_combinations:
+                path = rollout(agent_state["position"], combo, env)
+                cost = cost_path(path, drone, env, self.weights)
+                first_action = combo[0]
+                if cost < best_cost_for_action[first_action]:
+                    best_cost_for_action[first_action] = cost
+
+            env.is_obstacle = original_is_obstacle
+            
+            for action in self.action_list:
+                action_scores[action] += best_cost_for_action[action]
+
+        best_action = min(action_scores, key=action_scores.get)
+        return best_action
