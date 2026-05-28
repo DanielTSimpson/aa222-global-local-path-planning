@@ -3,37 +3,53 @@ import config as cfg
 from main import simulate_astar
 import time
 import csv
-from tqdm import tqdm
+from multiprocessing import Pool, cpu_count
 
 # the purpose of this is to implement a Monte Carlo optimization scheme to find the optimal set of weights for the simulated_annealing local planner
 # the plan is to extend this to other local planners once those are up
 
-def sample_weights():
-    # returns a random set of weights for each category
-    return {"science": np.random.uniform(0.0, 20.0), "explore": np.random.uniform(0.0, 10.0), "battery": np.random.uniform(0.1, 10.0), "obstacle": np.random.uniform(50.0, 300.0), "path": np.random.uniform(0.0, 20.0), "recovery": np.random.uniform(0.0, 30.0)}
+def run_single_trial(args):
+    # running a bunch of monte carlo sims back to back takes forever
+    # so, the plan is to try out some Fancy Parallel Computing to speed things up
+    
+    weights, seed = args
+    np.random.seed(seed)
+    print(f"Starting trial {seed}")
 
-def evaluate_weights(weights, num_trials = 50, candidate_id = 0, csv_path = "monte_carlo_weight_search.csv"):
-    # actually running through and checking the efficacy of a set of weights on a collection of different scenarios
-    results = []
-
+    # getting our planners in order
     if cfg.LOCAL_PLANNER_TYPE == "cross_entropy":
         cfg.CEM_WEIGHTS = weights
     elif cfg.LOCAL_PLANNER_TYPE == "simulated_annealing":
         cfg.SIMANNEAL_WEIGHTS = weights
 
-    for seed in tqdm(range(num_trials), desc=f"Trials for candidate {candidate_id}", leave=False):
-        np.random.seed(seed)
+    start = time.perf_counter()
 
-        start = time.perf_counter()
+    result = simulate_astar(trial_num = seed, render = 0, save_gif = False)
 
-        result = simulate_astar(trial_num=seed, render=0, save_gif=False)
+    runtime = time.perf_counter() - start
 
-        runtime = time.perf_counter() - start
+    print(f"Finished trial {seed} in {runtime} [s]")
 
-        results.append(result + (runtime,))
+    return seed, result, runtime
 
-        with open(csv_path, "a", newline="") as f:
-            writer = csv.writer(f)
+
+def sample_weights():
+    # returns a random set of weights for each category
+    return {"science": np.random.uniform(0.0, 20.0), "explore": np.random.uniform(0.0, 10.0), "battery": np.random.uniform(0.1, 10.0), "obstacle": np.random.uniform(50.0, 300.0), "path": np.random.uniform(0.0, 20.0), "recovery": np.random.uniform(0.0, 30.0)}
+
+def evaluate_weights(weights, pool, num_trials = 50, candidate_id = 0, csv_path = "monte_carlo_weight_search.csv", chunksize=4):
+    # actually running through and checking the efficacy of a set of weights on a collection of different scenarios
+    args = [(weights, seed) for seed in range(num_trials)]
+
+    trial_outputs = list(pool.imap_unordered(run_single_trial, args, chunksize=chunksize))
+
+    results = []
+
+    with open(csv_path, "a", newline="") as f:
+        writer = csv.writer(f)
+
+        for seed, result, runtime in trial_outputs:
+            results.append(result + (runtime,))
             writer.writerow([
                 candidate_id,
                 seed,
@@ -125,60 +141,67 @@ def monte_carlo_weight_search(num_candidates = 100, num_trials = 50):
     best_success_objective = None
     best_success_metrics = None
 
-    for i in tqdm(range(num_candidates), desc="Weight Candidates"):
-        # actually computing the results from each candidate
-        weights = sample_weights()
-        objective, metrics = evaluate_weights(weights, num_trials = num_trials, candidate_id = i, csv_path = trial_csv_path)
+    # now we try the multiprocessing thingie
+    num_workers = max(1, cpu_count() - 1)
+    chunksize = 1
 
-        # the first thing we check is which candidates do best by overall objective
-        if objective < best_objective:
-            best_objective = objective
-            best_weights = weights
-            best_metrics = metrics
+    with Pool(processes=num_workers) as pool:
+        # we're running each candidate in parallel to hopefully speed things up
+        for i in range(num_candidates):
+            print(f"Now on candidate {i}")
+            # actually computing the results from each candidate
+            weights = sample_weights()
+            objective, metrics = evaluate_weights(weights, pool, num_trials = num_trials, candidate_id = i, csv_path = trial_csv_path, chunksize=chunksize)
 
-            tqdm.write(f"New best objective at candidate {i}: {best_objective:.3f}")
+            # the first thing we check is which candidates do best by overall objective
+            if objective < best_objective:
+                best_objective = objective
+                best_weights = weights
+                best_metrics = metrics
 
-        # then we check which candidates actually succeed the most
-        if metrics["success_rate"] > best_success_rate:
-            best_success_rate = metrics["success_rate"]
-            best_success_weights = weights
-            best_success_objective = objective
-            best_success_metrics = metrics
-            tqdm.write(f"New best success rate at candidate {i}: {best_success_rate:.3f}")
+                print(f"New best objective at candidate {i}: {best_objective:.3f}")
 
-        with open(summary_csv_path, "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                i,
-                objective,
-                metrics["success_rate"],
-                metrics["avg_cost"],
-                metrics["avg_time"],
-                metrics["avg_science"],
-                metrics["avg_runtime"],
+            # then we check which candidates actually succeed the most
+            if metrics["success_rate"] > best_success_rate:
+                best_success_rate = metrics["success_rate"]
+                best_success_weights = weights
+                best_success_objective = objective
+                best_success_metrics = metrics
+                print(f"New best success rate at candidate {i}: {best_success_rate:.3f}")
 
-                weights["science"],
-                weights["explore"],
-                weights["battery"],
-                weights["obstacle"],
-                weights["path"],
-                weights["recovery"],
+            with open(summary_csv_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    i,
+                    objective,
+                    metrics["success_rate"],
+                    metrics["avg_cost"],
+                    metrics["avg_time"],
+                    metrics["avg_science"],
+                    metrics["avg_runtime"],
 
-                best_objective,
-                best_metrics["success_rate"] if best_metrics else None,
-                best_metrics["avg_science"] if best_metrics else None,
+                    weights["science"],
+                    weights["explore"],
+                    weights["battery"],
+                    weights["obstacle"],
+                    weights["path"],
+                    weights["recovery"],
 
-                best_success_rate,
-                best_success_objective,
-                best_success_metrics["avg_science"] if best_success_metrics else None,
+                    best_objective,
+                    best_metrics["success_rate"] if best_metrics else None,
+                    best_metrics["avg_science"] if best_metrics else None,
 
-                best_success_weights["science"] if best_success_weights else None,
-                best_success_weights["explore"] if best_success_weights else None,
-                best_success_weights["battery"] if best_success_weights else None,
-                best_success_weights["obstacle"] if best_success_weights else None,
-                best_success_weights["path"] if best_success_weights else None,
-                best_success_weights["recovery"] if best_success_weights else None,
-            ])
+                    best_success_rate,
+                    best_success_objective,
+                    best_success_metrics["avg_science"] if best_success_metrics else None,
+
+                    best_success_weights["science"] if best_success_weights else None,
+                    best_success_weights["explore"] if best_success_weights else None,
+                    best_success_weights["battery"] if best_success_weights else None,
+                    best_success_weights["obstacle"] if best_success_weights else None,
+                    best_success_weights["path"] if best_success_weights else None,
+                    best_success_weights["recovery"] if best_success_weights else None,
+                ])
     
 
 
@@ -196,4 +219,4 @@ def monte_carlo_weight_search(num_candidates = 100, num_trials = 50):
     return best_weights, best_objective, best_metrics, best_success_weights, best_success_objective, best_success_metrics
 
 if __name__ == "__main__":
-    monte_carlo_weight_search(num_candidates = 30, num_trials = 30)
+    monte_carlo_weight_search(num_candidates = 10, num_trials = 10)
