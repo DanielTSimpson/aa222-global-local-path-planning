@@ -58,7 +58,10 @@ class Drone:
                 self.env
             )
             for key, value in single_observation.items():
-                aggregated_observations[key].extend(value)
+                if key == "detected_small_science_scores":
+                    aggregated_observations[key].update(value)
+                else:
+                    aggregated_observations[key].extend(value)
         self.science_found = self.observe(aggregated_observations)
         
         self.local_optimizer = make_local_planner(cfg.LOCAL_PLANNER_TYPE) 
