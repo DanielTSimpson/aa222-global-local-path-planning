@@ -73,13 +73,7 @@ class Drone:
         """Execute action and update state."""
         self.last_action = action
 
-        step_cost = self.time_cost
-        if action in [2, 3, 4, 5, 6, 7, 8, 9]:
-            step_cost += self.movement_cost
-        self.budget -= step_cost
-
         prev_position = self.position.copy()
-
         x = self.x
         y = self.y
 
@@ -123,7 +117,6 @@ class Drone:
             y = max(0, self.y - 1)
             self.heading = -3 * np.pi / 4
 
-
         candidate = np.array([x, y])
 
         if self.env.is_obstacle(candidate[0], candidate[1]):
@@ -131,6 +124,11 @@ class Drone:
 
         self.position = candidate
         
+        step_cost = self.time_cost
+        if action in cfg.MOVES:
+            step_cost += self.movement_cost
+        self.budget -= step_cost
+
         if cfg.SMALL_SCIENCE_ENABLED:
             current_cell = tuple(self.position)
             if current_cell in self.env.small_science:
@@ -139,9 +137,7 @@ class Drone:
                     self.small_science_collected_value += value
                     self.env.collected_small_science.add(current_cell)
                     self.known_small_science.discard(current_cell)
-
-                    if cfg.VERBOSE_LOGGING:
-                        print(f"Drone collected small science at {current_cell} worth {value}")
+                    if cfg.VERBOSE_LOGGING: print(f"Drone collected small science at {current_cell} worth {value}")
 
         if np.array_equal(self.position, prev_position):
             self.stuck_count += 1
@@ -196,12 +192,10 @@ class Drone:
         
         # lastly, we check if the next global path step points into a known small obstacle
         if next_global_action is not None:
-            moves = {2: (0, 1), 3: (0, -1), 4: (-1, 0), 5: (1, 0), 6: (1, 1), 7: (-1, 1), 8: (1, -1), 9: (-1, -1)}
-            
-            if next_global_action not in moves:
+            if next_global_action not in cfg.MOVES:
                 return False
             
-            dx, dy = moves[next_global_action]
+            dx, dy = cfg.MOVES[next_global_action]
             
             next_cell = (self.x + dx, self.y + dy)
             

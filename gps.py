@@ -12,22 +12,19 @@ class GPS():
         self.gps_map = np.bitwise_or((environment.the_grid == environment.terrain["LARGE OBSTACLE"]), 
                         (environment.the_grid == environment.terrain["OBJECTIVE"])).astype(int)
         self.open_map = (environment.the_grid != environment.terrain["LARGE OBSTACLE"]).astype(int)
+        self.large_obstacles = environment.terrain["LARGE OBSTACLE"]
         self.drone_position = drone.position
         self.objective_position = environment.science_pos
 
     def _get_instructions(self, path):
         instructions = []
+        move_to_action = {v: k for k, v in cfg.MOVES.items()}
+        
         for i in range(1, len(path)):
             dx = path[i][0] - path[i-1][0]
             dy = path[i][1] - path[i-1][1]
-            if (dx, dy) == (0, 1): instructions.append(2)    # Up
-            elif (dx, dy) == (0, -1): instructions.append(3) # Down
-            elif (dx, dy) == (-1, 0): instructions.append(4) # Left
-            elif (dx, dy) == (1, 0): instructions.append(5)  # Right
-            elif (dx, dy) == (1, 1): instructions.append(6)  # Up-Right
-            elif (dx, dy) == (-1, 1): instructions.append(7) # Up-Left
-            elif (dx, dy) == (1, -1): instructions.append(8) # Down-Right
-            elif (dx, dy) == (-1, -1): instructions.append(9)# Down-Left
+            if (dx, dy) in move_to_action:
+                instructions.append(move_to_action[(dx, dy)])
         return instructions
     
     def a_star(self):
