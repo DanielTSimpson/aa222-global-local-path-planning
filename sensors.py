@@ -34,7 +34,7 @@ class OnlineSensor: # The agent's frustum-based camera
 
     def observe(self, drone_pos, heading, environment):
         visible_cells = self.get_visible_cells(drone_pos, heading, grid_size = environment.grid_size)
-        observations = {"visible_cells": visible_cells, "detected_obstacles": [], "detected_science": [], "detected_small_science": [], "missed_cells": []}
+        observations = {"visible_cells": visible_cells, "detected_obstacles": [], "detected_science": [], "detected_small_science": [], "detected_small_science_scores": {}, "missed_cells": []}
 
         for cell in visible_cells:
             r, c = cell
@@ -61,6 +61,7 @@ class OnlineSensor: # The agent's frustum-based camera
                 if cell in environment.small_science:
                     if cell not in environment.collected_small_science:
                         if np.random.random() > self.false_negative_rate:
+                            observations["detected_small_science"].append(cell)
                             observations["detected_small_science"].append(cell)
                         else:
                             observations["missed_cells"].append(cell)
