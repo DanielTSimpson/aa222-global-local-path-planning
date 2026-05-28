@@ -9,12 +9,22 @@ import config as cfg
 
 class GPS():
     def __init__(self, environment: SearchEnv, drone: Drone):
-        self.gps_map = np.bitwise_or((environment.the_grid == environment.terrain["LARGE OBSTACLE"]), 
-                        (environment.the_grid == environment.terrain["OBJECTIVE"])).astype(int)
+        self.environment = environment
         self.open_map = (environment.the_grid != environment.terrain["LARGE OBSTACLE"]).astype(int)
         self.large_obstacles = environment.terrain["LARGE OBSTACLE"]
+        self.observed_small_obstacles = np.zeros_like(environment.the_grid, dtype=bool)
+        
+        self.gps_map = np.bitwise_or((environment.the_grid == environment.terrain["LARGE OBSTACLE"]), 
+                        (environment.the_grid == environment.terrain["OBJECTIVE"])).astype(int)
+
         self.drone_position = drone.position
         self.objective_position = environment.science_pos
+
+    def _update_gps_map(self):
+        large_obs_map = (self.environment.the_grid == self.environment.terrain["LARGE OBSTACLE"])
+        objective_map = (self.environment.the_grid == self.environment.terrain["OBJECTIVE"])
+        temp_map = np.bitwise_or(large_obs_map, objective_map)
+        self.gps_map = np.bitwise_or(temp_map, self.observed_small_obstacles).astype(int)
 
     def _get_instructions(self, path):
         instructions = []
