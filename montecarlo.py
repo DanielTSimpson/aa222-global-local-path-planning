@@ -1,6 +1,6 @@
 import numpy as np
 import config as cfg
-from main import simulate_astar
+from main import simulate
 import time
 import csv
 from multiprocessing import Pool, cpu_count
@@ -24,7 +24,7 @@ def run_single_trial(args):
 
     start = time.perf_counter()
 
-    result = simulate_astar(trial_num = seed, render = 0, save_gif = False)
+    result = simulate(trial_num = seed, render = 0, save_gif = False)
 
     runtime = time.perf_counter() - start
 
