@@ -10,18 +10,17 @@ def make_local_planner(planner_type):
     # this is what'll be called in drone.py rather than having to pick a certain local planner explicitly
     # instead, we'll just make a call to this function and everything is taken care of here
     if planner_type == "simulated_annealing":
-        return SimulatedAnnealingOptimizer(horizon=5, iterations=100, initial_temp=10.0, cooling=0.95, weights=cfg.SIMANNEAL_WEIGHTS)
+        return SimulatedAnnealingOptimizer(horizon=5, iterations=100, initial_temp=10.0, cooling=0.95)
 
     if planner_type == "cross_entropy":
-        return CrossEntropyOptimizer(horizon=10, num_samples=100, num_elites=10, iterations=5, smoothing=0.7, weights=cfg.CEM_WEIGHTS)
+        return CrossEntropyOptimizer(horizon=10, num_samples=100, num_elites=10, iterations=5, smoothing=0.7)
 
     if planner_type == "pomdp":
-        return POMDP(horizon=3, num_simulations=50, weights=cfg.CEM_WEIGHTS)
+        return POMDP(horizon=3, num_simulations=50)
 
-    # TODO this part isn't done yet
+   
     if planner_type == "genetic":
-        weights = cfg.GENETIC_WEIGHTS
-        return None
+        return GeneticOptimizer(horizon=10, population_size=80, generations=12, elite_fraction=0.2, mutation_rate=0.15, crossover_rate=0.8)
 
     raise ValueError(f"Unknown planner type: {planner_type}") 
 
@@ -47,40 +46,44 @@ def rollout(position, actions, env):
     
     return path
 
-def cost_path(path, drone, env, weights):
-    # this function scores a path based on whatever metrics we're scoring off of for this run
+def _remaining_gps_steps(position, gps):
+    reconstructed_path, drone_instructions = gps.a_star(position)
+    if drone_instructions is None:
+        return float("inf")
+    return len(drone_instructions)
+
+def _move_budget_cost(num_steps, drone):
+    return num_steps * (drone.movement_cost + drone.time_cost)
+
+def score_path(path, drone, gps, env):
     if len(path) == 0:
-        return 1e9 # if the path is empty, give it a really poor score
-
-    # here we incorporate all of the separate costs and rewards we want to consider in our local objective function
-    movement_cost = len(path)
+        return -float("inf")
     
-    science_reward = sum(env.small_science.get(cell, 0) for cell in path if cell in getattr(drone, "known_small_science", set()))
+    local_budget = _move_budget_cost(len(path), drone)
+    budget_after_local_path = drone.budget - local_budget
     
-    exploration_reward = sum(1 for cell in path if cell not in drone.visited_cells)
+    final_cell = path[-1]
     
-    obstacle_penalty = sum(1 for cell in path if cell in getattr(drone, "known_small_obstacles", set()))
+    steps_to_final_objective = _remaining_gps_steps(final_cell, gps)
+    required_finish_budget = _move_budget_cost(steps_to_final_objective, drone) + cfg.MIN_FINAL_BUDGET
     
-    # in order to get our drone to eventually return to the nominal path, we include a penalty for straying too far from the main path
-    path_deviation_cost = 0.0
-    recovery_cost = 0.0
-    global_path = getattr(drone, "global_path", None)
-    if global_path is not None and len(global_path) > 0:
-        for cell in path:
-            distances = [abs(cell[0] - p[0]) + abs(cell[1] - p[1]) for p in global_path]
-            path_deviation_cost += min(distances) # we take the minimum distance from the cell to any point in the global path as our deviation cost
+    if budget_after_local_path < required_finish_budget:
+        return -float("inf")
     
-        # keep running into issues where the drone wanders and wanders around the same area without approaching the final destination
-        # this hopefully helps with that some
-        final_cell = path[-1]
-        future_path = global_path[getattr(drone, "global_path_index", 0):]
-        if len(future_path) > 0:
-            recovery_cost = min(abs(final_cell[0] - p[0]) + abs(final_cell[1] - p[1]) for p in future_path)
-
-    # now we incorporate the weights we have set for this run
-    # the first 3 terms are things we don't want, so they're additive. the last 2 terms are things we do want, so they're subtractive # removed + weights["path"] * path_deviation_cost for the time being
-    total_score = (weights["battery"] * movement_cost + weights["obstacle"] * obstacle_penalty  + weights["recovery"] * recovery_cost) - (weights["science"] * science_reward + weights["explore"] * exploration_reward)
-    return total_score
+    seen_pickups = set()
+    science_gain = 0.0
+    
+    for cell in path:
+        if cell in seen_pickups:
+            continue
+        
+        if cell in drone.known_small_science_scores:
+            science_gain += drone.known_small_science_scores[cell]
+            seen_pickups.add(cell)
+            
+    terminal_distance = float(np.linalg.norm(np.array(final_cell) - np.array(env.science_pos), ord=np.inf))
+    
+    return science_gain - cfg.LOCAL_STEP_TIEBREAKER * len(path) - cfg.LOCAL_GOAL_TIEBREAKER * terminal_distance
 
 # now we add in our different optimization algorithms
 
@@ -101,7 +104,7 @@ class SimulatedAnnealingOptimizer:
         current = np.random.choice(action_list, size = self.horizon)
         
         # we then score that path to have an initial score to beat in future iterations
-        current_score = cost_path(rollout(drone.position, current, env), drone, env, self.weights)
+        current_score = score_path(rollout(drone.position, current, env), drone, gps, env)
         
         best = current.copy()
         best_score = current_score
@@ -111,15 +114,15 @@ class SimulatedAnnealingOptimizer:
             candidate = current.copy()
             idx = np.random.randint(self.horizon) # we pick a random index in the path to alter
             candidate[idx] = np.random.choice(action_list) # and then we substitute the action at that index for a random one
-            candidate_score = cost_path(rollout(drone.position, candidate, env), drone, env, self.weights) 
+            candidate_score = score_path(rollout(drone.position, candidate, env), drone, gps, env) 
             
             # the next step is to see if our candidate performs better than our current path, or if we still just want to explore because of our temperature parameter
             delta = candidate_score - current_score
-            if delta < 0 or np.random.random() < np.exp(-delta/temp):
+            if delta > 0 or np.random.random() < np.exp(delta/temp):
                 current = candidate
                 current_score = candidate_score
                 
-            if current_score < best_score:
+            if current_score > best_score:
                 best = current.copy()
                 best_score = current_score
             
@@ -147,7 +150,7 @@ class CrossEntropyOptimizer:
         # first we iterate over the number of, you guessed it, iterations we want to try optimize over
         for _ in range(self.iterations):
             samples = []
-            costs = []
+            scores = []
 
             # then, we draw however many samples we need to try and paint a clear picture of the solution space
             for _ in range(self.num_samples):
@@ -162,15 +165,15 @@ class CrossEntropyOptimizer:
                 action_sequence = np.array(action_sequence)
 
                 path = rollout(drone.position, action_sequence, env)
-                cost = cost_path(path, drone, env, self.weights)
+                score = score_path(path, drone, gps, env)
 
                 samples.append(action_sequence)
-                costs.append(cost)
+                scores.append(score)
             
-            costs = np.array(costs)
+            scores = np.array(scores)
 
             # now we select the best performing samples to try and inform our next selection
-            elite_indices = np.argsort(costs)[:self.num_elites]
+            elite_indices = np.argsort(scores)[-self.num_elites:]
             elite_samples = [samples[i] for i in elite_indices]
 
             new_probs = np.zeros_like(probs)
@@ -238,22 +241,113 @@ class POMDP:  # This guy just keeps looping around the same three points.
         for _ in range(self.num_simulations):
             is_obstacle_mock = self.sample_environment_from_belief(belief_state)
 
-            best_cost_for_action = {action: float('inf') for action in self.action_list}
+            best_score_for_action = {action: -float('inf') for action in self.action_list}
 
             original_is_obstacle = env.is_obstacle
             env.is_obstacle = is_obstacle_mock
 
             for combo in all_combinations:
                 path = rollout(agent_state["position"], combo, env)
-                cost = cost_path(path, drone, env, self.weights)
+                score = score_path(path, drone, gps, env)
                 first_action = combo[0]
-                if cost < best_cost_for_action[first_action]:
-                    best_cost_for_action[first_action] = cost
+                if score > best_score_for_action[first_action]:
+                    best_score_for_action[first_action] = score
 
             env.is_obstacle = original_is_obstacle
             
             for action in self.action_list:
-                action_scores[action] += best_cost_for_action[action]
+                action_scores[action] += best_score_for_action[action]
 
-        best_action = min(action_scores, key=action_scores.get)
+        best_action = max(action_scores, key=action_scores.get)
         return best_action
+    
+class GeneticOptimizer:
+    def __init__(self, horizon=10, population_size=80, generations=12, elite_fraction=0.2, mutation_rate=0.15, crossover_rate=0.8):
+        self.horizon = horizon
+        self.population_size = population_size
+        self.generations = generations
+        self.elite_fraction = elite_fraction
+        self.mutation_rate = mutation_rate
+        self.crossover_rate = crossover_rate
+        self.action_list = list(cfg.MOVES.keys())
+        
+    def _random_individual(self):
+        # this generates a "random individual", which is really just one of our population
+        # each population member is just a set of instructions
+        return np.random.choice(self.action_list, size=self.horizon)
+    
+    def _evaluate(self, individual, drone, gps, env):
+        # this determines how well any individual does using the scoring metrics we care about
+        path = rollout(drone.position, individual, env)
+        return score_path(path, drone, gps, env)
+    
+    def _tournament_select(self, population, scores, tournament_size = 3):
+        # TODO ADD A DESCRIPTION HERE
+        indices = np.random.choice(len(population), size=tournament_size, replace=False)
+        best_index = max(indices, key = lambda index: scores[index])
+        return population[best_index].copy()
+    
+    def _crossover(self, parent_a, parent_b):
+        # this is where we take two individual parents and slam em together to see if their child can do any better
+        if np.random.random() > self.crossover_rate:
+            return parent_a.copy()
+        
+        split = np.random.randint(1, self.horizon)
+        
+        child = np.concatenate([parent_a[:split], parent_b[split:]])
+        return child
+    
+    def _mutate(self, individual):
+        # and this is where we add some of our own zest to individuals by mutating random "genes" within them
+        mutated = individual.copy()
+        for i in range(self.horizon):
+            if np.random.random() < self.mutation_rate:
+                mutated[i] = np.random.choice(self.action_list)
+                
+        return mutated
+    
+    def choose_action(self, drone, gps, env):
+        # this is where we actually go about choosing our actions and making use of the genetic algorithm
+        
+        # first, we take a sample population
+        population = [self._random_individual() for _ in range(self.population_size)]
+        
+        # then we determine how many within that population we're going to deem Elite
+        elite_count = max(1, int(self.elite_fraction * self.population_size))
+        
+        best_individual = None
+        best_score = -float("inf")
+        
+        for _ in range(self.generations):
+            scores = np.array([self._evaluate(individual, drone, gps, env) for individual in population])
+            
+            # once we've scored our population, we figure out who's the Cream Of The Crop
+            generation_best_index = int(np.argmax(scores))
+            
+            # if any of these new individuals happen to do better than our current best, the best gets Replaced
+            if scores[generation_best_index] > best_score:
+                best_score = scores[generation_best_index]
+                best_individual = population[generation_best_index].copy()
+            
+            # then we begin the process of taking the highest scoring subset of individuals and using them to generate the next population
+            elite_indices = np.argsort(scores)[-elite_count:]
+            new_population = [population[index] for index in elite_indices]
+            
+            # once we have our new elites, we use them to generate elite children until we have the desired number of individuals
+            while len(new_population) < self.population_size:
+                parent_a = self._tournament_select(population, scores)
+                parent_b = self._tournament_select(population, scores)
+
+                # for every child, we crossover the genes of the two parents and then give them a bit of a mutagenic twist
+                child = self._crossover(parent_a, parent_b)
+                child = self._mutate(child)
+                
+                new_population.append(child)
+            
+            population = new_population
+            
+        # if by some stroke of God we don't end up with a best individual, we just say fuck it and pick a random one
+        if best_individual is None:
+            return int(np.random.choice(self.action_list))
+    
+        return int(best_individual[0])

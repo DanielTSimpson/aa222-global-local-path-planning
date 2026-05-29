@@ -63,12 +63,11 @@ RENDER_PAUSE = 0.05
 # ===== Local planner parameters =====
 LOCAL_PLANNER_TYPE = "cross_entropy" # options are simulated_annealing, cross_entropy, genetic, and pomdp
 
-# TODO LATER: rather than have to tune each weight individually, it could be good to just have different run types
-# for instance, we could have a "science-focused" run where science is weighted above a nominal value, or a "battery-focused" run and so on
-# ===== Logging/Terminal Output =====
-SIMANNEAL_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0, "recovery": 10.0}
-CEM_WEIGHTS = {"science": 10.0, "explore": 2.0, "battery": 1.0, "obstacle": 100.0, "path": 5.0, "recovery": 3.0}
+MIN_FINAL_BUDGET = 25.0 # meant to add a buffer for the drone's "battery" budget, allowing it to reach the final objective
 
+# in the event that two possible paths collect the same science value, we need a tiebreaker of sorts
+LOCAL_STEP_TIEBREAKER = 1e-3
+LOCAL_GOAL_TIEBREAKER = 1e-4
 
 # ===== Logging/Terminal Output =====
 VERBOSE_LOGGING = False

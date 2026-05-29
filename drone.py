@@ -138,6 +138,7 @@ class Drone:
             step_cost += self.movement_cost
         self.budget -= step_cost
 
+        # this is the bit that actually awards science value, gets rid of any pickups we've collected, and does some other fun stuff
         if cfg.SMALL_SCIENCE_ENABLED:
             current_cell = tuple(self.position)
             if current_cell in self.env.small_science:
@@ -190,6 +191,9 @@ class Drone:
             
         for small_science_cell in observations["detected_small_science"]:
             self.known_small_science.add(small_science_cell)
+            
+        # this tells the drone where the pickups are and how much they're worth
+        self.known_small_science.update(observations.get("detected_small_science_scores", {}))
 
         science_observed = len(observations["detected_science"]) > 0
 

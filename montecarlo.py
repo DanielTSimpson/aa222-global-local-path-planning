@@ -220,4 +220,4 @@ def monte_carlo_weight_search(num_candidates = 100, num_trials = 50):
     return best_weights, best_objective, best_metrics, best_success_weights, best_success_objective, best_success_metrics
 
 if __name__ == "__main__":
-    monte_carlo_weight_search(num_candidates = 10, num_trials = 10)
+    monte_carlo_weight_search(num_candidates = 100, num_trials = 30)
