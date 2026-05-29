@@ -37,6 +37,7 @@ class Drone:
         self.known_science = set()
         
         self.known_small_science = set()
+        self.known_small_science_scores = {}
         self.small_science_collected_value = 0
         
         self.current_visible_cells = set()
@@ -47,6 +48,7 @@ class Drone:
             "detected_obstacles": [],
             "detected_science": [],
             "detected_small_science": [],
+            "detected_small_science_scores": {},
             "missed_cells": [],
         }
         for i in range(8):
@@ -56,7 +58,10 @@ class Drone:
                 self.env
             )
             for key, value in single_observation.items():
-                aggregated_observations[key].extend(value)
+                if key == "detected_small_science_scores":
+                    aggregated_observations[key].update(value)
+                else:
+                    aggregated_observations[key].extend(value)
         self.science_found = self.observe(aggregated_observations)
         
         self.local_optimizer = make_local_planner(cfg.LOCAL_PLANNER_TYPE) 
@@ -137,6 +142,7 @@ class Drone:
                     self.small_science_collected_value += value
                     self.env.collected_small_science.add(current_cell)
                     self.known_small_science.discard(current_cell)
+                    self.known_small_science_scores.pop(current_cell, None)
                     if cfg.VERBOSE_LOGGING: print(f"Drone collected small science at {current_cell} worth {value}")
 
         if np.array_equal(self.position, prev_position):

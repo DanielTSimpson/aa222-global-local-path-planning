@@ -9,7 +9,6 @@ np.random.seed(cfg.SEED)
 
 def initialize_drone(env):
     """Initialize drones at random positions that don't see the science initially
-    
     Args:
         env: SearchEnv object
         
@@ -90,6 +89,7 @@ def simulate(trial_num = 0, render=False, save_gif=False):
             break
 
         # Calculates the distance from the agent to the closest point on the global path
+        
         if hasattr(drone, "global_path") and drone.global_path is not None:
             # Using np.linalg.norm so we can swap between different distance calc methods and be consistent w/ A* method
             drone.global_path_index = min(range(len(drone.global_path)), key = lambda k: float(np.linalg.norm(np.array([drone.x, drone.y]) - np.array(drone.global_path[k][0], drone.global_path[k][1]), ord=np.inf)))
