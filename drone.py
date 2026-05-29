@@ -210,12 +210,12 @@ class Drone:
                 environment=self.env,
             )
         if cfg.SMALL_SCIENCE_ENABLED and len(single_observation["detected_small_science"])> 0:
-            print("\t Found science!")
+            if cfg.VERBOSE_LOGGING: print("\t Found science!")
             return True
         
         # then we check to see if the drone is repeatedly failing to move
         if self.stuck_count > 0:
-            print("\t I'm stuck!")
+            if cfg.VERBOSE_LOGGING: print("\t I'm stuck!")
             return True
             
         return False

@@ -88,14 +88,14 @@ def simulate(trial_num = 0, render=False, save_gif=False):
             drone.global_path_index = np.argmin(distances)
 
         # Get the next action from the global plan, or default to 1 (collect) if finished
-        if drone.global_path_index < len(drone.global_instructions):
+        if drone.global_instructions is not None and drone.global_path_index < len(drone.global_instructions):
             global_action = drone.global_instructions[drone.global_path_index]
         else:
             global_action = 1
             
         # Check if local planning is required to collect small science or get unstuck
         if drone.local_optimizer_needed():
-            print(f"Running Optimizer: {cfg.LOCAL_PLANNER_TYPE}")
+            if cfg.VERBOSE_LOGGING: print(f"Running Optimizer: {cfg.LOCAL_PLANNER_TYPE}")
             action = drone.local_optimizer.choose_action(drone, gps, env)
         else:
             action = global_action
