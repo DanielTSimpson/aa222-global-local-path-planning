@@ -7,22 +7,23 @@ import itertools
 # things like calculation time, score at end of the simulation, frequency of obstacle collisions, etc.
 
 def make_local_planner(planner_type):
-    # this is what'll be called in drone.py rather than having to pick a certain local planner explicitly
-    # instead, we'll just make a call to this function and everything is taken care of here
     if planner_type == "simulated_annealing":
-        return SimulatedAnnealingOptimizer(horizon=5, iterations=100, initial_temp=10.0, cooling=0.95)
+        params = getattr(cfg, "SIMANNEAL_HYPERPARAMS", {})
+        return SimulatedAnnealingOptimizer(**params)
 
     if planner_type == "cross_entropy":
-        return CrossEntropyOptimizer(horizon=10, num_samples=100, num_elites=10, iterations=5, smoothing=0.7)
+        params = getattr(cfg, "CEM_HYPERPARAMS", {})
+        return CrossEntropyOptimizer(**params)
 
     if planner_type == "pomdp":
-        return POMDP(horizon=3, num_simulations=50)
+        params = getattr(cfg, "POMDP_HYPERPARAMS", {})
+        return POMDP(**params)
 
-   
     if planner_type == "genetic":
-        return GeneticOptimizer(horizon=10, population_size=80, generations=12, elite_fraction=0.2, mutation_rate=0.15, crossover_rate=0.8)
+        params = getattr(cfg, "GENETIC_HYPERPARAMS", {})
+        return GeneticOptimizer(**params)
 
-    raise ValueError(f"Unknown planner type: {planner_type}") 
+    raise ValueError(f"Unknown planner type: {planner_type}")
 
 def rollout(position, actions, env):
     # this function rolls out a collection of actions from the current position and returns candidate paths
@@ -141,7 +142,9 @@ class CrossEntropyOptimizer:
         self.action_list = list(cfg.MOVES.keys())
 
     def choose_action(self, drone, gps, env):
-        # TODO write a description here
+        # for this one, we repeatedly sample action sequences from a probability distyribution
+        # we label the sequences that do the best as elites (kind of like for genetic algorithms), and those in turn influence the probability distribution
+        # after doing this a couple of times, we 
         num_actions = len(self.action_list)
 
         # we initialize with a uniform distribution over every action at each timestep
@@ -282,7 +285,7 @@ class GeneticOptimizer:
         return score_path(path, drone, gps, env)
     
     def _tournament_select(self, population, scores, tournament_size = 3):
-        # TODO ADD A DESCRIPTION HERE
+        # randomly pick a subset of the current population and return the best individual from that subset
         indices = np.random.choice(len(population), size=tournament_size, replace=False)
         best_index = max(indices, key = lambda index: scores[index])
         return population[best_index].copy()
