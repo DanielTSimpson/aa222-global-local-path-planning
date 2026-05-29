@@ -5,14 +5,18 @@ Implements intelligent decision-making for science search and extinguish
 
 import numpy as np
 from environment import SearchEnv
+from gps import GPS
 from sensors import OnlineSensor
 from local_planner import *
 import config as cfg
 
 
 class Drone:
-    def __init__(self, environment: SearchEnv):
+    def __init__(self, environment: SearchEnv, gps: GPS):
         self.env = environment
+        self.gps = gps
+        self.global_path = None
+        self.global_instructions = None
 
         self.position = np.array([environment.grid_size - 2, environment.grid_size - 2])
         self.heading = 0.0
@@ -58,7 +62,10 @@ class Drone:
                 self.env
             )
             for key, value in single_observation.items():
-                aggregated_observations[key].extend(value)
+                if isinstance(aggregated_observations[key], list):
+                    aggregated_observations[key].extend(value)
+                elif isinstance(aggregated_observations[key], dict):
+                    aggregated_observations[key].update(value)
         self.science_found = self.observe(aggregated_observations)
         
         self.local_optimizer = make_local_planner(cfg.LOCAL_PLANNER_TYPE) 
@@ -168,6 +175,15 @@ class Drone:
 
         for obstacle in observations["detected_obstacles"]:
             self.known_small_obstacles.add(obstacle)
+            self.gps.add_small_obstacle(obstacle)
+            if self.global_path is not None and obstacle in self.global_path:
+                reconstructed_path, drone_instructions = self.gps.a_star(self.position)
+                self.global_path = reconstructed_path
+                self.global_instructions = drone_instructions
+                self.global_path_index = 0
+                if drone_instructions is None:
+                    if cfg.VERBOSE_LOGGING: print("\tFAILURE: GPS A* failed to find a path.")
+                    return
 
         for science_cell in observations["detected_science"]:
             self.known_science.add(science_cell)

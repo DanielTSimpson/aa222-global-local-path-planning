@@ -7,21 +7,6 @@ import matplotlib.pyplot as plt
 
 np.random.seed(cfg.SEED)
 
-def initialize_drone(env):
-    """Initialize drones at random positions that don't see the science initially
-    Args:
-        env: SearchEnv object
-        
-    Returns:
-        Drone: finalized Drone object
-    """
-    drone = Drone(env)
-    drone.movement_cost = cfg.MOVEMENT_COST
-    drone.time_cost = cfg.TIME_COST    
-    drone.visited_cells.add(tuple(drone.position))
-
-    return drone
-
 def simulate(trial_num = 0, render=False, save_gif=False):
     ### Initialize simulation parameters
     t_0 = cfg.INITIAL_TIME
@@ -38,13 +23,19 @@ def simulate(trial_num = 0, render=False, save_gif=False):
     if cfg.SMALL_SCIENCE_ENABLED:
         env.generate_small_science(num_small_science = cfg.NUM_SMALL_SCIENCE, min_value = cfg.SMALL_SCIENCE_MIN_VALUE, max_value = cfg.SMALL_SCIENCE_MAX_VALUE)
 
-    ### Initialize the drone
-    drone = initialize_drone(env)
-
     ### Initialize the GPS
-    gps = GPS(env, drone)
-    reconstructed_path, drone_instructions = gps.a_star()
+    gps = GPS(env)
+
+    ### Initialize the drone
+    drone = Drone(env, gps)
+    drone.movement_cost = cfg.MOVEMENT_COST
+    drone.time_cost = cfg.TIME_COST
+    drone.visited_cells.add(tuple(drone.position))
+
+    ### Calculate initial global path
+    reconstructed_path, drone_instructions = gps.a_star(drone.position)
     drone.global_path = reconstructed_path
+    drone.global_instructions = drone_instructions
     drone.global_path_index = 0
     if drone_instructions is None:
         if cfg.VERBOSE_LOGGING: print("\tFAILURE: GPS A* failed to find a path.")
@@ -61,10 +52,10 @@ def simulate(trial_num = 0, render=False, save_gif=False):
 
         # Start rendering
         if render == True or save_gif:
-            env.render(drone, path=reconstructed_path)
+            env.render(drone, path=drone.global_path)
             if render == True: plt.pause(render_pause) # Small delay between rendered frames
             while env.paused: # When Pause button is toggled, pause the environment
-                env.render(drone, path=reconstructed_path)
+                env.render(drone, path=drone.global_path)
                 plt.pause(0.1)
         
         # Check for budget failure
@@ -89,18 +80,18 @@ def simulate(trial_num = 0, render=False, save_gif=False):
             break
 
         # Calculates the distance from the agent to the closest point on the global path
-        
         if hasattr(drone, "global_path") and drone.global_path is not None:
             # Using np.linalg.norm so we can swap between different distance calc methods and be consistent w/ A* method
-            drone.global_path_index = min(range(len(drone.global_path)), key = lambda k: float(np.linalg.norm(np.array([drone.x, drone.y]) - np.array(drone.global_path[k][0], drone.global_path[k][1]), ord=np.inf)))
+            drone.global_path_index = min(range(len(drone.global_path)), key = lambda k: float(np.linalg.norm(np.array([drone.x, drone.y]) - np.array(drone.global_path[k]), ord=np.inf)))
         # Calculate the next global action based on path progress, rather than simulation time
-        global_action = drone_instructions[drone.global_path_index] if getattr(drone, "global_path_index", 0) < len(drone_instructions) else 1
+        global_action = drone.global_instructions[drone.global_path_index] if getattr(drone, "global_path_index", 0) < len(drone.global_instructions) else 1
         # then, we see if this leads to one of the local planning optimizers needing to kick in (via an obstacle, science, etc.)
         if drone.local_optimizer_needed(global_action):
             action = drone.local_optimizer.choose_action(drone, gps, env)
         else:
             action = global_action
         drone.action(action)
+
 
     # Monte Carlo vars
     total_cost = cfg.MAX_BUDGET - drone.budget
@@ -113,8 +104,7 @@ def simulate(trial_num = 0, render=False, save_gif=False):
     
     ## Close the Simulation
     if save_gif:
-        gif_fps = int(2.0 / cfg.RENDER_PAUSE) if cfg.RENDER_PAUSE > 0 else 10
-        env.save_gif(f"simulation_trial_{trial_num}.gif", fps=gif_fps)
+        gif_fps = 10
         env.close(save_gif=save_gif, filename=f"simulation_trial_{trial_num}.gif", fps=gif_fps)
     else:
         env.close()

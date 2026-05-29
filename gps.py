@@ -2,30 +2,27 @@
 GPS module of the path planning algo.
 Handles scanning for large obstacles
 """
-from drone import Drone
 from environment import SearchEnv
 import numpy as np
 import config as cfg
 
 class GPS():
-    def __init__(self, environment: SearchEnv, drone: Drone):
+    def __init__(self, environment: SearchEnv):
         self.environment = environment
-        self.open_map = (environment.the_grid != environment.terrain["LARGE OBSTACLE"]).astype(int)
-        self.large_obstacles = environment.terrain["LARGE OBSTACLE"]
-        self.observed_small_obstacles = np.zeros_like(environment.the_grid, dtype=bool)
-        
-        self.gps_map = np.bitwise_or((environment.the_grid == environment.terrain["LARGE OBSTACLE"]), 
-                        (environment.the_grid == environment.terrain["OBJECTIVE"])).astype(int)
+        self.large_obstacle_map = (self.environment.the_grid == self.environment.terrain["LARGE OBSTACLE"]) # GPS can only see the large obstacles
+        self.observed_small_obstacles = np.zeros_like(environment.the_grid, dtype=bool) # It can learn about small obstacles through the drone
 
-        self.drone_position = drone.position
+        self.open_map = (~self.large_obstacle_map).astype(int)
+        self.gps_map = self.large_obstacle_map.astype(int)
         self.objective_position = environment.science_pos
 
-    def _update_gps_map(self):
-        large_obs_map = (self.environment.the_grid == self.environment.terrain["LARGE OBSTACLE"])
-        objective_map = (self.environment.the_grid == self.environment.terrain["OBJECTIVE"])
-        temp_map = np.bitwise_or(large_obs_map, objective_map)
-        self.gps_map = np.bitwise_or(temp_map, self.observed_small_obstacles).astype(int)
-
+    def add_small_obstacle(self, position):
+        """Adds a newly observed small obstacle to the map and updates pathfinding maps."""
+        if not self.observed_small_obstacles[position]:
+            self.observed_small_obstacles[position] = True
+            self.gps_map = np.bitwise_or(self.large_obstacle_map, self.observed_small_obstacles).astype(int)
+            self.open_map = 1 - self.gps_map
+        
     def _get_instructions(self, path):
         instructions = []
         move_to_action = {v: k for k, v in cfg.MOVES.items()}
@@ -37,7 +34,7 @@ class GPS():
                 instructions.append(move_to_action[(dx, dy)])
         return instructions
     
-    def a_star(self):
+    def a_star(self, drone_position):
         """
         Applies the A-star path search algorithm to determine where a drone should move
         Source: https://www.datacamp.com/tutorial/a-star-algorithm
@@ -58,12 +55,12 @@ class GPS():
                 position = parent.get(position)
             return path[::-1]
 
-        start = tuple(self.drone_position)
+        start = tuple(drone_position)
         finish = tuple(self.objective_position)
         openList = [start]
         closedList = []
         g_score: dict[tuple, float] = {start: 0}
-        h_score: dict[tuple, float] = {start: heuristic(self.drone_position, self.objective_position)}
+        h_score: dict[tuple, float] = {start: heuristic(drone_position, self.objective_position)}
         f_score: dict[tuple, float] = {start: g_score[start] + h_score[start]}
         parent: dict[tuple, tuple | None] = {start: None}
 

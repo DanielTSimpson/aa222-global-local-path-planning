@@ -280,27 +280,24 @@ class SearchEnv(Env):
 
     def _record_frame(self):
         try:
-            from matplotlib.backends.backend_agg import FigureCanvasAgg
-            canvas = self.fig.canvas
-            if isinstance(canvas, FigureCanvasAgg):
-                buf = canvas.buffer_rgba()
-                image = np.frombuffer(buf, dtype='uint8')
-            else:
+            try:
+                # Fast path: buffer_rgba natively preserves 3D shape (H, W, 4)
+                buf = self.fig.canvas.buffer_rgba()
+                image = np.asarray(buf)
+                if image.ndim != 3:
+                    raise ValueError("Buffer is flat, using PNG fallback")
+            except (AttributeError, ValueError):
+                # Fallback path if buffer_rgba is not supported by the backend or is flat
                 import io
                 buf_io = io.BytesIO()
-                self.fig.savefig(buf_io, format='raw', dpi=self.fig.dpi)
+                self.fig.savefig(buf_io, format='png', dpi=self.fig.dpi)
                 buf_io.seek(0)
-                image = np.frombuffer(buf_io.getvalue(), dtype='uint8')
-            
-            w, h = self.fig.canvas.get_width_height()
-            if len(image) != w * h * 4:
-                scale = (len(image) / (w * h * 4)) ** 0.5
-                w = int(round(w * scale))
-                h = int(round(h * scale))
-            
-            image = image.reshape((h, w, 4))
-            image = image[:, :, :3].copy() # Convert RGBA to RGB
-            self.frames.append(image)
+                image = imageio.imread(buf_io)
+                
+            # Convert RGBA to RGB if it has 4 channels
+            if len(image.shape) == 3 and image.shape[2] == 4:
+                image = image[:, :, :3]
+            self.frames.append(image.copy())
         except Exception as e:
             print(f"Warning: Failed to record frame: {e}")
 
