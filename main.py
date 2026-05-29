@@ -14,6 +14,8 @@ def simulate(trial_num = 0, render=False, save_gif=False):
     t_f = cfg.MAX_SIMULATION_TIME
     render_pause = cfg.RENDER_PAUSE if render else 0.0
     N = int((t_f - t_0) / dt)
+    
+    failure_modes = {"SUCCESS": 0, "BUDGET FAILURE": 1, "TIME FAILURE": 2, "STUCK FAILURE": 3}
 
     ### Initialize environment
     env = SearchEnv(grid_size=cfg.GRID_SIZE)
@@ -39,10 +41,10 @@ def simulate(trial_num = 0, render=False, save_gif=False):
     drone.global_path_index = 0
     if drone_instructions is None:
         if cfg.VERBOSE_LOGGING: print("\tFAILURE: GPS A* failed to find a path.")
-        return
+        stats = {"TOTAL COST": cfg.MAX_BUDGET, "TOTAL_TIME": 0, "SMALL_SCIENCE_VALUE": 0}
+        return failure_modes["STUCK FAILURE"], stats
 
     ### Initialize Failure Trackers
-    failure_modes = {"SUCCESS": 0, "BUDGET FAILURE": 1, "TIME FAILURE": 2,"STUCK FAILURE": 3} # 0 = success, 1 = budget failure, 
     time_f = 0 # Final time
     failure_mode = failure_modes.get("TIME FAILURE") # Default failure mode if the loop finishes
 
@@ -79,14 +81,21 @@ def simulate(trial_num = 0, render=False, save_gif=False):
             if cfg.VERBOSE_LOGGING: print("\tFAILURE: Drones got Stuck")
             break
 
-        # Calculates the distance from the agent to the closest point on the global path
-        if hasattr(drone, "global_path") and drone.global_path is not None:
-            # Using np.linalg.norm so we can swap between different distance calc methods and be consistent w/ A* method
-            drone.global_path_index = min(range(len(drone.global_path)), key = lambda k: float(np.linalg.norm(np.array([drone.x, drone.y]) - np.array(drone.global_path[k]), ord=np.inf)))
-        # Calculate the next global action based on path progress, rather than simulation time
-        global_action = drone.global_instructions[drone.global_path_index] if getattr(drone, "global_path_index", 0) < len(drone.global_instructions) else 1
-        # then, we see if this leads to one of the local planning optimizers needing to kick in (via an obstacle, science, etc.)
-        if drone.local_optimizer_needed(global_action):
+        # Update progress by finding the closest point on the global path
+        if drone.global_path is not None:
+            current_pos = np.array([drone.x, drone.y])
+            distances = [float(np.linalg.norm(current_pos - np.array(p), ord=np.inf)) for p in drone.global_path]
+            drone.global_path_index = np.argmin(distances)
+
+        # Get the next action from the global plan, or default to 1 (collect) if finished
+        if drone.global_path_index < len(drone.global_instructions):
+            global_action = drone.global_instructions[drone.global_path_index]
+        else:
+            global_action = 1
+            
+        # Check if local planning is required to collect small science or get unstuck
+        if drone.local_optimizer_needed():
+            print(f"Running Optimizer: {cfg.LOCAL_PLANNER_TYPE}")
             action = drone.local_optimizer.choose_action(drone, gps, env)
         else:
             action = global_action
@@ -99,7 +108,7 @@ def simulate(trial_num = 0, render=False, save_gif=False):
     small_science_value = drone.small_science_collected_value
 
     # Check for time failure
-    if failure_mode == 2 and cfg.VERBOSE_LOGGING:
+    if failure_mode == failure_modes.get("TIME FAILURE") and cfg.VERBOSE_LOGGING:
         print("\tFAILURE: Exceeded max sim time")
     
     ## Close the Simulation

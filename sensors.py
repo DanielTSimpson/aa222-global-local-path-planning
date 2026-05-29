@@ -62,7 +62,6 @@ class OnlineSensor: # The agent's frustum-based camera
                     if cell not in environment.collected_small_science:
                         if np.random.random() > self.false_negative_rate:
                             observations["detected_small_science"].append(cell)
-                            observations["detected_small_science"].append(cell)
                         else:
                             observations["missed_cells"].append(cell)
 

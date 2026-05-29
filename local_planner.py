@@ -63,16 +63,17 @@ def cost_path(path, drone, env, weights):
     
     # in order to get our drone to eventually return to the nominal path, we include a penalty for straying too far from the main path
     path_deviation_cost = 0.0
-    if hasattr(drone, "global_path"):
+    global_path = getattr(drone, "global_path", None)
+    if global_path is not None and len(global_path) > 0:
         for cell in path:
-            distances = [abs(cell[0] - p[0]) + abs(cell[1] - p[1]) for p in drone.global_path]
+            distances = [abs(cell[0] - p[0]) + abs(cell[1] - p[1]) for p in global_path]
             path_deviation_cost += min(distances) # we take the minimum distance from the cell to any point in the global path as our deviation cost
     
         # keep running into issues where the drone wanders and wanders around the same area without approaching the final destination
         # this hopefully helps with that some
         recovery_cost = 0.0
         final_cell = path[-1]
-        future_path = drone.global_path[getattr(drone, "global_path_index", 0):]
+        future_path = global_path[getattr(drone, "global_path_index", 0):]
         if len(future_path) > 0:
             recovery_cost = min(abs(final_cell[0] - p[0]) + abs(final_cell[1] - p[1]) for p in future_path)
 

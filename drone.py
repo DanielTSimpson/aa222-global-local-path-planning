@@ -194,31 +194,28 @@ class Drone:
         science_observed = len(observations["detected_science"]) > 0
 
         if science_observed and cfg.VERBOSE_LOGGING:
-            print("Drone found science objective!")
+            print("===== COMPLETED MISSION ======\n" +
+                  "Drone found science objective!" + 
+                  "==============================")
 
         return science_observed
 
-    def local_optimizer_needed(self, next_global_action = None):
-        # checks to see if something is in the global path or if there's something worth deviating for, and then returns if a local optimizer is neede
+    def local_optimizer_needed(self):
+        # checks to see if there's something worth deviating for, and then returns if a local optimizer is needed
         
         # first, we see if there's a small science objective that's been detected
-        if cfg.SMALL_SCIENCE_ENABLED and len(self.known_small_science) > 0:
+        single_observation = self.sensor.observe(
+                drone_pos=self.position,
+                heading=self.heading,
+                environment=self.env,
+            )
+        if cfg.SMALL_SCIENCE_ENABLED and len(single_observation["detected_small_science"])> 0:
+            print("\t Found science!")
             return True
         
         # then we check to see if the drone is repeatedly failing to move
         if self.stuck_count > 0:
+            print("\t I'm stuck!")
             return True
-        
-        # lastly, we check if the next global path step points into a known small obstacle
-        if next_global_action is not None:
-            if next_global_action not in cfg.MOVES:
-                return False
-            
-            dx, dy = cfg.MOVES[next_global_action]
-            
-            next_cell = (self.x + dx, self.y + dy)
-            
-            if next_cell in self.known_small_obstacles:
-                return True
             
         return False
