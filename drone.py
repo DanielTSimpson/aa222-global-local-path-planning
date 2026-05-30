@@ -193,7 +193,7 @@ class Drone:
             self.known_small_science.add(small_science_cell)
             
         # this tells the drone where the pickups are and how much they're worth
-        self.known_small_science.update(observations.get("detected_small_science_scores", {}))
+        self.known_small_science_scores.update(observations.get("detected_small_science_scores", {}))
 
         science_observed = len(observations["detected_science"]) > 0
 
