@@ -3,49 +3,104 @@ import config as cfg
 from main import simulate
 import time
 import csv
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Queue, Process, cpu_count
+import queue as queue_module
 
 # the purpose of this is to implement a Monte Carlo optimization scheme to find the optimal set of weights for the simulated_annealing local planner
 # the plan is to extend this to other local planners once those are up
+        
+def _trial_worker(q, planner_type, params, seed):
+    try:
+        np.random.seed(seed)
+        apply_hyperparameters(planner_type, params)
 
-def run_single_trial(args):
-    # runs a single test using a set of randomly chosen hyperparameters
-    planner_type, params, seed = args
-    np.random.seed(seed)
+        start = time.perf_counter()
+        result = simulate(
+            trial_num=seed,
+            render=False,
+            save_gif=False
+        )
+        runtime = time.perf_counter() - start
 
-    print(f"Starting {planner_type} trial {seed}")
+        failure_mode, stats = result
 
-    apply_hyperparameters(planner_type, params)
+        q.put((
+            seed,
+            (
+                failure_mode,
+                stats["TOTAL COST"],
+                stats["TOTAL_TIME"],
+                stats["SMALL_SCIENCE_VALUE"],
+            ),
+            runtime,
+        ))
 
-    start = time.perf_counter()
-    result = simulate(trial_num=seed, render=False, save_gif=False)
-    runtime = time.perf_counter() - start
+    except Exception:
+        runtime = 0.0
+        q.put((seed, (-2, 1e9, 1e9, 0.0), runtime))
+        
+def run_trials_parallel(args_list, timeout=60, max_workers=None):
+    if max_workers is None:
+        max_workers = max(1, cpu_count() - 1)
 
-    failure_mode, stats = result
+    remaining = list(args_list)
+    results = []
 
-    return seed, (
-        failure_mode,
-        stats["TOTAL COST"],
-        stats["TOTAL_TIME"],
-        stats["SMALL_SCIENCE_VALUE"]
-    ), runtime
+    while remaining:
+        batch = remaining[:max_workers]
+        remaining = remaining[max_workers:]
 
+        processes = []
+
+        for args in batch:
+            q = Queue()
+            p = Process(
+                target=_trial_worker,
+                args=(q, *args)
+            )
+            p.start()
+            processes.append((p, q, args, time.perf_counter()))
+
+        for p, q, args, start in processes:
+            planner_type, params, seed = args
+
+            p.join(timeout=timeout)
+
+            if p.is_alive():
+                p.terminate()
+                p.join()
+
+                runtime = time.perf_counter() - start
+                results.append((seed, (-1, 1e9, 1e9, 0.0), runtime))
+
+            else:
+                try:
+                    results.append(q.get_nowait())
+                except queue_module.Empty:
+                    runtime = time.perf_counter() - start
+                    results.append((seed, (-2, 1e9, 1e9, 0.0), runtime))
+
+    return results
 
 def sample_hyperparameters(planner_type):
     # rather than try and optimize over weights, we're now optimizing hyperparameters for each local planning algo.
     if planner_type == "simulated_annealing":
         return {
             "horizon": np.random.randint(3, 16),
-            "iterations": np.random.randint(25, 251),
+            "iterations": np.random.randint(25, 101),
             "initial_temp": np.random.uniform(1.0, 30.0),
             "cooling": np.random.uniform(0.85, 0.99),
         }
+        
+    # to prevent running into issues, I'm gonna do a lil magic
+    num_samples = np.random.randint(25, 101)
+    num_elites = np.random.randint(3, min(30, num_samples) + 1)
 
     if planner_type == "cross_entropy":
         return {
             "horizon": np.random.randint(3, 16),
-            "num_samples": np.random.randint(25, 251),
-            "num_elites": np.random.randint(3, 30),
+            "num_samples": num_samples,
+            "num_elites": num_elites,
             "iterations": np.random.randint(2, 12),
             "smoothing": np.random.uniform(0.3, 0.9),
         }
@@ -59,8 +114,8 @@ def sample_hyperparameters(planner_type):
     if planner_type == "genetic":
         return {
             "horizon": np.random.randint(3, 16),
-            "population_size": np.random.randint(20, 151),
-            "generations": np.random.randint(3, 31),
+            "population_size": np.random.randint(20, 81),
+            "generations": np.random.randint(3, 16),
             "elite_fraction": np.random.uniform(0.05, 0.4),
             "mutation_rate": np.random.uniform(0.02, 0.35),
             "crossover_rate": np.random.uniform(0.4, 1.0),
@@ -84,11 +139,11 @@ def apply_hyperparameters(planner_type, params):
     elif planner_type == "genetic":
         cfg.GENETIC_HYPERPARAMS = params
 
-def evaluate_hyperparameters(planner_type, params, pool, num_trials=50, candidate_id=0, csv_path="monte_carlo_trial_results.csv", chunksize=4):
+def evaluate_hyperparameters(planner_type, params, num_trials=50, candidate_id=0, csv_path="monte_carlo_trial_results.csv", timeout=60):
     # does exactly as the function title says -- determines how well a set of hyperparameters performed
     args = [(planner_type, params, seed) for seed in range(num_trials)]
 
-    trial_outputs = list(pool.imap_unordered(run_single_trial, args, chunksize=chunksize))
+    trial_outputs = run_trials_parallel(args, timeout=timeout, max_workers = max(1, cpu_count() - 1))
 
     results = []
 
@@ -124,7 +179,7 @@ def score_results(results):
 
     return objective, {"success_rate": success_rate, "avg_cost": avg_cost, "avg_time": avg_time, "avg_science": avg_science, "avg_runtime": avg_runtime}
 
-def monte_carlo_hyperparameter_search(planner_types = ("simulated_annealing", "cross_entropy", "pomdp", "genetic"), num_candidates = 100, num_trials = 50):
+def monte_carlo_hyperparameter_search(planner_types = ("simulated_annealing", "cross_entropy", "genetic"), num_candidates = 100, num_trials = 50):
     # the heavy hitter function here, this is what actually consolidates all of our data to hopefully find the best candidates
     # before we search, need to quickly set up our csv file
     
@@ -143,40 +198,34 @@ def monte_carlo_hyperparameter_search(planner_types = ("simulated_annealing", "c
     with open(summary_csv_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["planner_type", "candidate_id", "objective", "success_rate", "avg_cost", "avg_time", "avg_science", "avg_runtime", "params", "best_objective_so_far", "best_success_rate_so_far"])
-
-    # now we try the multiprocessing thingie
-    num_workers = max(1, cpu_count() - 1)
-    chunksize = 1
     
     overall_best = {}
 
-    with Pool(processes=num_workers) as pool:
-        # we're running each candidate in parallel to hopefully speed things up
-        for planner_type in planner_types:
-            print(f"\n===== Searching {planner_type} =====")
+    for planner_type in planner_types:
+        print(f"\n===== Searching {planner_type} =====")
 
-            best_params = None
-            best_objective = float("inf")
-            best_metrics = None
-            best_success_rate = -float("inf")
-            
-            for candidate_id in range(num_candidates):
-                params = sample_hyperparameters(planner_type)
-                
-                objective, metrics = evaluate_hyperparameters(planner_type, params, pool, num_trials=num_trials, candidate_id = candidate_id, csv_path = trial_csv_path, chunksize = chunksize)
-                
-                if objective < best_objective:
-                    best_objective = objective
-                    best_params = params
-                    best_metrics = metrics
-                    
-                if metrics["success_rate"] > best_success_rate:
-                    best_success_rate = metrics["success_rate"]
-                
-                with open(summary_csv_path, "a", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerow([planner_type, candidate_id, objective, metrics["success_rate"], metrics["avg_cost"], metrics["avg_time"], metrics["avg_science"], metrics["avg_runtime"], str(params), best_objective, best_success_rate])
+        best_params = None
+        best_objective = float("inf")
+        best_metrics = None
+        best_success_rate = -float("inf")
         
+        for candidate_id in range(num_candidates):
+            params = sample_hyperparameters(planner_type)
+            
+            objective, metrics = evaluate_hyperparameters(planner_type, params, num_trials=num_trials, candidate_id = candidate_id, csv_path = trial_csv_path)
+            
+            if objective < best_objective:
+                best_objective = objective
+                best_params = params
+                best_metrics = metrics
+                
+            if metrics["success_rate"] > best_success_rate:
+                best_success_rate = metrics["success_rate"]
+            
+            with open(summary_csv_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([planner_type, candidate_id, objective, metrics["success_rate"], metrics["avg_cost"], metrics["avg_time"], metrics["avg_science"], metrics["avg_runtime"], str(params), best_objective, best_success_rate])
+    
         overall_best[planner_type] = {"best_params": best_params, "best_objective": best_objective, "best_metrics": best_metrics}
         
         print(f"\nBest for {planner_type}:")
@@ -187,4 +236,4 @@ def monte_carlo_hyperparameter_search(planner_types = ("simulated_annealing", "c
     return overall_best
 
 if __name__ == "__main__":
-    monte_carlo_hyperparameter_search(planner_types=("simulated_annealing", "cross_entropy", "pomdp", "genetic"), num_candidates = 100, num_trials = 30)
+    monte_carlo_hyperparameter_search(planner_types=("simulated_annealing", "cross_entropy", "genetic"), num_candidates = 5, num_trials = 5)

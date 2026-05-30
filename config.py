@@ -63,7 +63,7 @@ RENDER_PAUSE = 0.05
 # ===== Local planner parameters =====
 LOCAL_PLANNER_TYPE = "cross_entropy" # options are simulated_annealing, cross_entropy, genetic, and pomdp
 
-SIMANNEAL_HYPERPARAMS = {"horizons": 5, "iterations": 100, "initial_temp": 10.0, "cooling": 0.95}
+SIMANNEAL_HYPERPARAMS = {"horizon": 5, "iterations": 100, "initial_temp": 10.0, "cooling": 0.95}
 CEM_HYPERPARAMS = {"horizon": 10, "num_samples": 100, "num_elites": 10, "iterations": 5, "smoothing": 0.7}
 POMDP_HYPERPARAMS = {"horizon": 3, "num_simulations": 50}
 GENETIC_HYPERPARAMS = {"horizon": 10, "population_size": 80, "generations": 12, "elite_fraction": 0.2, "mutation_rate": 0.15, "crossover_rate": 0.8}

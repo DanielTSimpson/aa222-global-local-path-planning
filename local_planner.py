@@ -47,11 +47,26 @@ def rollout(position, actions, env):
     
     return path
 
+_GPS_STEP_CACHE = {}
+
 def _remaining_gps_steps(position, gps):
+    position = tuple(position)
+    
+    obstacle_key = tuple(sorted(map(tuple, np.argwhere(gps.gps_map > 0))))
+    cache_key = (position, obstacle_key)
+
+    if cache_key in _GPS_STEP_CACHE:
+        return _GPS_STEP_CACHE[cache_key]
+    
     reconstructed_path, drone_instructions = gps.a_star(position)
     if drone_instructions is None:
         return float("inf")
-    return len(drone_instructions)
+    else:
+        steps = len(drone_instructions)
+    
+    _GPS_STEP_CACHE[cache_key] = steps
+    
+    return steps
 
 def _move_budget_cost(num_steps, drone):
     return num_steps * (drone.movement_cost + drone.time_cost)
@@ -214,7 +229,7 @@ class POMDP:  # This guy just keeps looping around the same three points.
         }
         belief_state = {
             "visited": drone.visited_cells.copy(),
-            "large_obstacles": np.argwhere(gps.large_obstacles > 0).tolist(),
+            "large_obstacles": np.argwhere(gps.large_obstacle_map > 0).tolist(),
             "small_obstacles": drone.known_small_obstacles.copy(),
             "known_science": drone.known_small_science.copy()
         }
