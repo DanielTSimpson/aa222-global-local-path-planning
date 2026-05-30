@@ -1,0 +1,2 @@
+planner_type,candidate_id,objective,success_rate,avg_cost,avg_time,avg_science,avg_runtime,params,best_objective_so_far,best_success_rate_so_far
+simulated_annealing,0,-778.9154406512766,0.8666666666666667,548.1538461538462,6.926923076923076,3.3076923076923075,11.817168280001109,"{'horizon': 9, 'iterations': 76, 'initial_temp': 28.57071488588757, 'cooling': 0.9524791518535967}",-778.9154406512766,0.8666666666666667

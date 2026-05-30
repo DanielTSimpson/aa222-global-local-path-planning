@@ -45,6 +45,9 @@ def run_trials_parallel(args_list, timeout=60, max_workers=None):
 
     remaining = list(args_list)
     results = []
+    
+    completed = 0
+    total = len(args_list)
 
     while remaining:
         batch = remaining[:max_workers]
@@ -72,13 +75,18 @@ def run_trials_parallel(args_list, timeout=60, max_workers=None):
 
                 runtime = time.perf_counter() - start
                 results.append((seed, (-1, 1e9, 1e9, 0.0), runtime))
+                completed += 1
+                print(f"Completed {completed}/{total} (TIMEOUT) | seed={seed} | runtime={runtime:.1f}", flush=True)
 
             else:
                 try:
                     results.append(q.get_nowait())
+                    completed += 1
+                    print(f"Completed {completed}/{total} | seed={seed}", flush=True)
                 except queue_module.Empty:
                     runtime = time.perf_counter() - start
                     results.append((seed, (-2, 1e9, 1e9, 0.0), runtime))
+                    print(f"Completed {completed}/{total} | seed={seed}", flush=True)
 
     return results
 
@@ -210,6 +218,7 @@ def monte_carlo_hyperparameter_search(planner_types = ("simulated_annealing", "c
         best_success_rate = -float("inf")
         
         for candidate_id in range(num_candidates):
+            print(f"\n[{planner_type}] Candidate {candidate_id + 1}/{num_candidates}", flush=True)
             params = sample_hyperparameters(planner_type)
             
             objective, metrics = evaluate_hyperparameters(planner_type, params, num_trials=num_trials, candidate_id = candidate_id, csv_path = trial_csv_path)
@@ -236,4 +245,4 @@ def monte_carlo_hyperparameter_search(planner_types = ("simulated_annealing", "c
     return overall_best
 
 if __name__ == "__main__":
-    monte_carlo_hyperparameter_search(planner_types=("simulated_annealing", "cross_entropy", "genetic"), num_candidates = 5, num_trials = 5)
+    monte_carlo_hyperparameter_search(planner_types=("simulated_annealing", "cross_entropy", "genetic"), num_candidates = 20, num_trials = 15)
